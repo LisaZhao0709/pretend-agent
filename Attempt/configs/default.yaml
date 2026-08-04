@@ -1,0 +1,10 @@
+project_name: predictive-agents
+timezone: Asia/Shanghai
+random_seed: 42
+data_root: F:\Predictive agents\Data
+resources_root: F:\Predictive agents\Resources
+default_data_split:
+  strategy: time_based
+  train_ratio: 0.7
+  validation_ratio: 0.15
+  test_ratio: 0.15

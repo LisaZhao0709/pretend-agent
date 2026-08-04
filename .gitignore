@@ -1,0 +1,46 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local environments
+.venv/
+venv/
+env/
+.python-version.local
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs, checkpoints, and generated outputs
+*.log
+logs/
+checkpoints/
+models/
+outputs/
+Attempt/**/outputs/
+Attempt/**/run_logs/
+
+# Local databases and large generated artifacts
+*.sqlite
+*.sqlite3
+*.db
+*.parquet
+Data/Cache/
+
+# Notebook-generated state
+.ipynb_checkpoints/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+desktop.ini
