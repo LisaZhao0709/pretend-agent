@@ -35,7 +35,8 @@ Attempt/**/run_logs/
 *.sqlite3
 *.db
 *.parquet
-Data/Cache/
+Data/Cache/*
+!Data/Cache/.gitkeep
 
 # Notebook-generated state
 .ipynb_checkpoints/
