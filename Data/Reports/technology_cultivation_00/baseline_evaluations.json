@@ -1,0 +1,102 @@
+[
+  {
+    "topic_id": "ai_agent",
+    "topic_label": "AI Agents",
+    "column": "gdelt_count",
+    "method": "moving_average",
+    "mae": 0.0,
+    "mape": 0.0,
+    "rmse": 0.0,
+    "test_size": 9
+  },
+  {
+    "topic_id": "ai_agent",
+    "topic_label": "AI Agents",
+    "column": "gdelt_count",
+    "method": "linear_regression",
+    "mae": 0.0,
+    "mape": 0.0,
+    "rmse": 0.0,
+    "test_size": 9
+  },
+  {
+    "topic_id": "edge_comp",
+    "topic_label": "Edge Computing",
+    "column": "gdelt_count",
+    "method": "moving_average",
+    "mae": 0.0,
+    "mape": 0.0,
+    "rmse": 0.0,
+    "test_size": 9
+  },
+  {
+    "topic_id": "edge_comp",
+    "topic_label": "Edge Computing",
+    "column": "gdelt_count",
+    "method": "linear_regression",
+    "mae": 0.0,
+    "mape": 0.0,
+    "rmse": 0.0,
+    "test_size": 9
+  },
+  {
+    "topic_id": "llm",
+    "topic_label": "Large Language Models",
+    "column": "gdelt_count",
+    "method": "moving_average",
+    "mae": 1155.4814814814813,
+    "mape": 16.368613776094293,
+    "rmse": 2037.0058879773323,
+    "test_size": 9
+  },
+  {
+    "topic_id": "llm",
+    "topic_label": "Large Language Models",
+    "column": "gdelt_count",
+    "method": "linear_regression",
+    "mae": 4917.546978719607,
+    "mape": 47.616391595395214,
+    "rmse": 5118.89326503257,
+    "test_size": 9
+  },
+  {
+    "topic_id": "quantum_comp",
+    "topic_label": "Quantum Computing",
+    "column": "gdelt_count",
+    "method": "moving_average",
+    "mae": 321.85185185185185,
+    "mape": 25.42984170282588,
+    "rmse": 448.9667149256291,
+    "test_size": 9
+  },
+  {
+    "topic_id": "quantum_comp",
+    "topic_label": "Quantum Computing",
+    "column": "gdelt_count",
+    "method": "linear_regression",
+    "mae": 624.4763724647219,
+    "mape": 40.95134357743806,
+    "rmse": 696.508497784714,
+    "test_size": 9
+  },
+  {
+    "topic_id": "robotics",
+    "topic_label": "Robotics",
+    "column": "gdelt_count",
+    "method": "moving_average",
+    "mae": 0.0,
+    "mape": 0.0,
+    "rmse": 0.0,
+    "test_size": 9
+  },
+  {
+    "topic_id": "robotics",
+    "topic_label": "Robotics",
+    "column": "gdelt_count",
+    "method": "linear_regression",
+    "mae": 0.0,
+    "mape": 0.0,
+    "rmse": 0.0,
+    "test_size": 9
+  }
+]

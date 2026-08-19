@@ -1,0 +1,17 @@
+# Per-source switches and parameters
+sources:
+  openalex:
+    enabled: true
+  gdelt:
+    enabled: true
+  github:
+    enabled: true
+    k_new: 100           # Top-K for newly created repos in the last 7 days per query
+    k_active: 50         # Top-K for recently active repos (pushed in last 1 day) per query
+    delta_7d_threshold: 100  # Stars increase in 7 days to mark as surging (if prior snapshot exists)
+    use_llm_summarize: false # Gate LLM summarization for very long descriptions
+    llm_daily_cap: 30
+    description_max_chars: 280
+    # Optional filters
+    language_whitelist: []   # e.g., ["Python", "JavaScript"]
+    org_whitelist: []        # e.g., ["pytorch", "tensorflow"]

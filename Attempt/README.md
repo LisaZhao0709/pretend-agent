@@ -9,7 +9,11 @@
 - `Reproduction/`：复现论文、开源项目或他人已完成的实验。
 - `Baselines/`：简单基线、传统方法、无 Agent 方法和对照实验。
 - `Sandbox/`：尚未归类、短期验证和风险较低的探索。
-- `Shared/`：多个分类共用的工具、评测、数据加载器和通用模块。
+- `Shared/`：多个分类共用的工具、评测、数据加载器、Agent 和通用模块。
+  - `src/tools/`：数据采集工具（OpenAlex、GDELT、GitHub 等）和统一搜索接口。
+  - `src/agents/`：多 Agent 架构（DataCollectionAgent、DataAnalysisAgent、PredictionAgent、ReportAgent）。
+  - `src/processors/`：数据规范化、质量检查和特征提取。
+  - `src/data_collectors/`：API 客户端（openalex_client、gdelt_client）。
 - `scripts/`：环境、数据检查和重复运行脚本。
 - `notebooks/`：探索性 notebook；稳定逻辑应迁移到分类目录的 `src/`。
 - `configs/`：跨实验的公共配置。

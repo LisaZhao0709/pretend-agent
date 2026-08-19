@@ -1,0 +1,141 @@
+"""Configuration loader and path manager for Predictive Agents pipeline."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+ATTEMPT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CONFIG_PATH = ATTEMPT_ROOT / "configs" / "default.yaml"
+
+
+@dataclass
+class TopicConfig:
+    topic_id: str
+    topic_label: str
+    openalex_query: str
+    gdelt_query: str
+
+
+@dataclass
+class PipelineConfig:
+    project_name: str
+    timezone: str
+    random_seed: int
+    data_root: Path
+    resources_root: Path
+    dataset_name: str
+    start_date: str
+    end_date: str
+    window_size_months: int
+    train_ratio: float
+    validation_ratio: float
+    test_ratio: float
+    topics: list[TopicConfig] = field(default_factory=list)
+
+    @property
+    def raw_api_path(self) -> Path:
+        return self.data_root / "Raw" / "APIs" / self.dataset_name
+
+    @property
+    def interim_path(self) -> Path:
+        return self.data_root / "Interim" / self.dataset_name
+
+    @property
+    def processed_path(self) -> Path:
+        return self.data_root / "Processed" / self.dataset_name
+
+    @property
+    def reports_path(self) -> Path:
+        return self.data_root / "Reports" / self.dataset_name
+
+
+def load_yaml_config(path: Path) -> dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def load_topics(topics_path: Path) -> list[TopicConfig]:
+    raw = load_yaml_config(topics_path)
+    topics = []
+    for item in raw.get("topics", []):
+        topics.append(TopicConfig(
+            topic_id=item["topic_id"],
+            topic_label=item["topic_label"],
+            openalex_query=item["openalex_query"],
+            gdelt_query=item["gdelt_query"],
+        ))
+    return topics
+
+
+def load_pipeline_config(
+    config_path: Path | None = None,
+    topics_path: Path | None = None,
+) -> PipelineConfig:
+    if config_path is None:
+        config_path = DEFAULT_CONFIG_PATH
+    if topics_path is None:
+        topics_path = ATTEMPT_ROOT / "configs" / "topics.yaml"
+
+    raw = load_yaml_config(config_path)
+    split = raw.get("default_data_split", {})
+
+    cfg = PipelineConfig(
+        project_name=raw.get("project_name", "predictive-agents"),
+        timezone=raw.get("timezone", "Asia/Shanghai"),
+        random_seed=raw.get("random_seed", 42),
+        data_root=Path(raw.get("data_root", str(PROJECT_ROOT / "Data"))),
+        resources_root=Path(raw.get("resources_root", str(PROJECT_ROOT / "Resources"))),
+        dataset_name="technology_cultivation_00",
+        start_date="2023-01",
+        end_date="2025-07",
+        window_size_months=1,
+        train_ratio=split.get("train_ratio", 0.7),
+        validation_ratio=split.get("validation_ratio", 0.15),
+        test_ratio=split.get("test_ratio", 0.15),
+    )
+
+    if topics_path.exists():
+        cfg.topics = load_topics(topics_path)
+
+    return cfg
+
+
+def generate_monthly_windows(
+    start: str,
+    end: str,
+) -> list[tuple[str, str]]:
+    """Generate (window_start, window_end) pairs in YYYY-MM format.
+
+    Each window covers one month. The end month is exclusive.
+    """
+    start_dt = datetime.strptime(start, "%Y-%m")
+    end_dt = datetime.strptime(end, "%Y-%m")
+    windows: list[tuple[str, str]] = []
+    current = start_dt
+    while current < end_dt:
+        if current.month == 12:
+            next_month = current.replace(year=current.year + 1, month=1)
+        else:
+            next_month = current.replace(month=current.month + 1)
+        windows.append((current.strftime("%Y-%m"), next_month.strftime("%Y-%m")))
+        current = next_month
+    return windows
+
+
+def ensure_dirs(cfg: PipelineConfig) -> None:
+    for path in [
+        cfg.raw_api_path / "openalex",
+        cfg.raw_api_path / "gdelt",
+        cfg.interim_path,
+        cfg.processed_path,
+        cfg.reports_path,
+    ]:
+        path.mkdir(parents=True, exist_ok=True)

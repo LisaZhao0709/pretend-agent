@@ -1,0 +1,87 @@
+{
+  "dataset": "technology_cultivation_00",
+  "started_at": "2026-08-17 21:41:03",
+  "by_topic": [
+    {
+      "topic_id": "llm",
+      "topic_label": "Large Language Models",
+      "sources": {
+        "openalex": {
+          "error": "400 Client Error: Bad Request for url: https://api.openalex.org/works?search=large+language+model&filter=from_publication_date%3A2023-01-01%2Cto_publication_date%3A2025-07-01&group_by=publication_date&per_page=500&mailto=research%40example.com"
+        },
+        "gdelt": {
+          "records": 30
+        },
+        "github": {
+          "records": 1,
+          "date": "2026-08-17"
+        }
+      }
+    },
+    {
+      "topic_id": "ai_agent",
+      "topic_label": "AI Agents",
+      "sources": {
+        "openalex": {
+          "error": "400 Client Error: Bad Request for url: https://api.openalex.org/works?search=AI+agent+autonomous&filter=from_publication_date%3A2023-01-01%2Cto_publication_date%3A2025-07-01&group_by=publication_date&per_page=500&mailto=research%40example.com"
+        },
+        "gdelt": {
+          "records": 30
+        },
+        "github": {
+          "records": 1,
+          "date": "2026-08-17"
+        }
+      }
+    },
+    {
+      "topic_id": "robotics",
+      "topic_label": "Robotics",
+      "sources": {
+        "openalex": {
+          "error": "OpenAlex API rate-limited after 5 retries"
+        },
+        "gdelt": {
+          "records": 30
+        },
+        "github": {
+          "records": 1,
+          "date": "2026-08-17"
+        }
+      }
+    },
+    {
+      "topic_id": "quantum_comp",
+      "topic_label": "Quantum Computing",
+      "sources": {
+        "openalex": {
+          "error": "400 Client Error: Bad Request for url: https://api.openalex.org/works?search=quantum+computing&filter=from_publication_date%3A2023-01-01%2Cto_publication_date%3A2025-07-01&group_by=publication_date&per_page=500&mailto=research%40example.com"
+        },
+        "gdelt": {
+          "records": 30
+        },
+        "github": {
+          "records": 1,
+          "date": "2026-08-17"
+        }
+      }
+    },
+    {
+      "topic_id": "edge_comp",
+      "topic_label": "Edge Computing",
+      "sources": {
+        "openalex": {
+          "error": "400 Client Error: Bad Request for url: https://api.openalex.org/works?search=edge+computing&filter=from_publication_date%3A2023-01-01%2Cto_publication_date%3A2025-07-01&group_by=publication_date&per_page=500&mailto=research%40example.com"
+        },
+        "gdelt": {
+          "records": 30
+        },
+        "github": {
+          "records": 1,
+          "date": "2026-08-17"
+        }
+      }
+    }
+  ],
+  "finished_at": "2026-08-17 22:01:10"
+}

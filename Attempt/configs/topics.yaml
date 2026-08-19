@@ -1,0 +1,25 @@
+topics:
+  - topic_id: llm
+    topic_label: Large Language Models
+    openalex_query: large language model
+    gdelt_query: "large language model"
+
+  - topic_id: ai_agent
+    topic_label: AI Agents
+    openalex_query: AI agent autonomous
+    gdelt_query: "AI agent"
+
+  - topic_id: robotics
+    topic_label: Robotics
+    openalex_query: robotics manipulation
+    gdelt_query: robotics
+
+  - topic_id: quantum_comp
+    topic_label: Quantum Computing
+    openalex_query: quantum computing
+    gdelt_query: "quantum computing"
+
+  - topic_id: edge_comp
+    topic_label: Edge Computing
+    openalex_query: edge computing
+    gdelt_query: "edge computing"

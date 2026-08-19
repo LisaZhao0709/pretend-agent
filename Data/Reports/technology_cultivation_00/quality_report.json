@@ -1,0 +1,58 @@
+{
+  "overall_score": 23,
+  "by_topic": {
+    "ai_agent": {
+      "label": "AI Agents",
+      "windows": 30,
+      "openalex_coverage": 0.0,
+      "gdelt_coverage": 0.0,
+      "github_coverage": 0.3,
+      "overall_coverage": 0.1
+    },
+    "edge_comp": {
+      "label": "Edge Computing",
+      "windows": 30,
+      "openalex_coverage": 0.0,
+      "gdelt_coverage": 0.0,
+      "github_coverage": 0.3,
+      "overall_coverage": 0.1
+    },
+    "llm": {
+      "label": "Large Language Models",
+      "windows": 30,
+      "openalex_coverage": 0.0,
+      "gdelt_coverage": 1.0,
+      "github_coverage": 0.3,
+      "overall_coverage": 0.43333333333333335
+    },
+    "quantum_comp": {
+      "label": "Quantum Computing",
+      "windows": 30,
+      "openalex_coverage": 0.0,
+      "gdelt_coverage": 1.0,
+      "github_coverage": 0.3,
+      "overall_coverage": 0.43333333333333335
+    },
+    "robotics": {
+      "label": "Robotics",
+      "windows": 30,
+      "openalex_coverage": 0.0,
+      "gdelt_coverage": 0.0,
+      "github_coverage": 0.3,
+      "overall_coverage": 0.1
+    }
+  },
+  "issues": [
+    "Topic ai_agent: low coverage (10.0%)",
+    "Topic ai_agent: no OpenAlex data",
+    "Topic ai_agent: no GDELT data",
+    "Topic edge_comp: low coverage (10.0%)",
+    "Topic edge_comp: no OpenAlex data",
+    "Topic edge_comp: no GDELT data",
+    "Topic llm: no OpenAlex data",
+    "Topic quantum_comp: no OpenAlex data",
+    "Topic robotics: low coverage (10.0%)",
+    "Topic robotics: no OpenAlex data",
+    "Topic robotics: no GDELT data"
+  ]
+}
