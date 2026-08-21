@@ -24,8 +24,11 @@ from config import (
     generate_monthly_windows,
     load_pipeline_config,
 )
-from data_collectors.openalex_client import collect_openalex_topic
-from data_collectors.gdelt_client import collect_gdelt_topic
+import yaml as _yaml
+# New unified collector API (replaces old per-source function clients)
+import data_collectors.crossref  # noqa: F401 - registers collector
+import data_collectors.gdelt      # noqa: F401 - registers collector
+from data_collectors.base import get_collector
 from processors.normalize import (
     build_feature_matrix,
     create_pivot_table,
@@ -39,8 +42,17 @@ from evaluator import evaluate_forecast, summarize_results
 from report_generator import generate_report
 
 
+def _load_sources_cfg() -> dict:
+    """Load sources.yaml for http settings and per-source config."""
+    sources_yaml = ATTEMPT_ROOT / "configs" / "sources.yaml"
+    if sources_yaml.exists():
+        with open(sources_yaml, "r", encoding="utf-8") as f:
+            return _yaml.safe_load(f) or {}
+    return {}
+
+
 def run_collection(cfg: PipelineConfig) -> list[dict]:
-    """Phase 1: Collect raw data from OpenAlex and GDELT."""
+    """Phase 1: Collect raw data from CrossRef and GDELT via unified collectors."""
     print("=" * 60)
     print("Phase 1: Data Collection")
     print("=" * 60)
@@ -48,45 +60,38 @@ def run_collection(cfg: PipelineConfig) -> list[dict]:
     windows = generate_monthly_windows(cfg.start_date, cfg.end_date)
     print(f"Time windows: {cfg.start_date} → {cfg.end_date} ({len(windows)} months)")
 
-    all_openalex: list[dict] = []
+    raw_cfg = _load_sources_cfg()
+    http_settings = raw_cfg.get("http", {})
+    sources_cfg = raw_cfg.get("sources", {})
+
+    all_crossref: list[dict] = []
     all_gdelt: list[dict] = []
 
-    for topic in cfg.topics:
-        print(f"\n  [{topic.topic_id}] {topic.topic_label}")
-
-        print(f"    OpenAlex: querying {len(windows)} windows...")
-        oa_records = collect_openalex_topic(
-            topic_id=topic.topic_id,
-            topic_label=topic.topic_label,
-            query=topic.openalex_query,
-            windows=windows,
-            cache_dir=cfg.raw_api_path / "openalex",
-        )
-        all_openalex.extend(oa_records)
-        cached_count = sum(1 for r in oa_records if r["cached"])
-        print(f"    OpenAlex: {len(oa_records)} records ({cached_count} cached)")
-
-        print(f"    GDELT: querying {len(windows)} windows...")
-        gd_records = collect_gdelt_topic(
-            topic_id=topic.topic_id,
-            topic_label=topic.topic_label,
-            query=topic.gdelt_query,
-            windows=windows,
-            cache_dir=cfg.raw_api_path / "gdelt",
-        )
-        all_gdelt.extend(gd_records)
-        cached_count = sum(1 for r in gd_records if r["cached"])
-        print(f"    GDELT: {len(gd_records)} records ({cached_count} cached)")
+    for source_name, label in [("crossref", "CrossRef"), ("gdelt", "GDELT")]:
+        sc = sources_cfg.get(source_name, {})
+        if not sc.get("enabled", False):
+            print(f"\n  {label}: disabled in sources.yaml, skipping")
+            continue
+        print(f"\n  {label}: querying {len(windows)} windows x {len(cfg.topics)} topics...")
+        collector = get_collector(source_name)
+        recs = collector.collect(cfg, http_settings, sc)
+        cached_count = sum(1 for r in recs if r.get("cached"))
+        ok_count = sum(1 for r in recs if r.get("collection_status") == "ok")
+        print(f"    {label}: {len(recs)} records ({ok_count} ok, {len(recs) - ok_count} failed, {cached_count} cached)")
+        if source_name == "crossref":
+            all_crossref.extend(recs)
+        else:
+            all_gdelt.extend(recs)
 
     # Save interim records
-    oa_path = cfg.interim_path / "openalex_activity.jsonl"
+    cr_path = cfg.interim_path / "crossref_activity.jsonl"
     gd_path = cfg.interim_path / "gdelt_activity.jsonl"
-    save_records_to_jsonl(all_openalex, oa_path)
+    save_records_to_jsonl(all_crossref, cr_path)
     save_records_to_jsonl(all_gdelt, gd_path)
-    print(f"\n  Saved: {oa_path} ({len(all_openalex)} records)")
+    print(f"\n  Saved: {cr_path} ({len(all_crossref)} records)")
     print(f"  Saved: {gd_path} ({len(all_gdelt)} records)")
 
-    return all_openalex + all_gdelt
+    return all_crossref + all_gdelt
 
 
 def run_normalization(
@@ -99,13 +104,14 @@ def run_normalization(
     print("=" * 60)
 
     if all_records is None:
-        oa_records = load_jsonl(cfg.interim_path / "openalex_activity.jsonl")
+        cr_records = load_jsonl(cfg.interim_path / "crossref_activity.jsonl")
         gd_records = load_jsonl(cfg.interim_path / "gdelt_activity.jsonl")
-        all_records = merge_records_by_source(oa_records, gd_records)
+        all_records = merge_records_by_source([], gd_records, cr_records)
     else:
         all_records = merge_records_by_source(
             [r for r in all_records if r["source"] == "openalex"],
             [r for r in all_records if r["source"] == "gdelt"],
+            [r for r in all_records if r["source"] == "crossref"],
         )
 
     pivot = create_pivot_table(all_records)
@@ -146,7 +152,7 @@ def run_baseline_forecast(
         rows_sorted = sorted(rows, key=lambda r: r["window_start"])
         print(f"\n  [{tid}] {rows_sorted[0]['topic_label']} ({len(rows_sorted)} months)")
 
-        for column in ["openalex_count", "gdelt_count"]:
+        for column in ["crossref_count", "gdelt_count"]:
             for method in ["moving_average", "linear_regression"]:
                 result = forecast_topic(
                     pivot_rows=rows_sorted,

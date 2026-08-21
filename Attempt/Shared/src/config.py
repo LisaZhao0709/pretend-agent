@@ -22,6 +22,7 @@ class TopicConfig:
     topic_label: str
     openalex_query: str
     gdelt_query: str
+    crossref_query: str = ""
 
 
 @dataclass
@@ -71,6 +72,7 @@ def load_topics(topics_path: Path) -> list[TopicConfig]:
             topic_label=item["topic_label"],
             openalex_query=item["openalex_query"],
             gdelt_query=item["gdelt_query"],
+            crossref_query=item.get("crossref_query", item["openalex_query"]),
         ))
     return topics
 
@@ -93,10 +95,10 @@ def load_pipeline_config(
         random_seed=raw.get("random_seed", 42),
         data_root=Path(raw.get("data_root", str(PROJECT_ROOT / "Data"))),
         resources_root=Path(raw.get("resources_root", str(PROJECT_ROOT / "Resources"))),
-        dataset_name="technology_cultivation_00",
-        start_date="2023-01",
-        end_date="2025-07",
-        window_size_months=1,
+        dataset_name=raw.get("dataset_name", "technology_cultivation_00"),
+        start_date=raw.get("start_date", "2023-01"),
+        end_date=raw.get("end_date", "2025-07"),
+        window_size_months=int(raw.get("window_size_months", 1)),
         train_ratio=split.get("train_ratio", 0.7),
         validation_ratio=split.get("validation_ratio", 0.15),
         test_ratio=split.get("test_ratio", 0.15),
@@ -106,6 +108,22 @@ def load_pipeline_config(
         cfg.topics = load_topics(topics_path)
 
     return cfg
+
+
+def month_range(window_start: str) -> tuple[str, str]:
+    """Convert a YYYY-MM window start to (first_day, last_day) in YYYY-MM-DD.
+
+    Used by per-month count collectors (CrossRef, OpenAlex) that need explicit
+    day-level date filters for their API calls.
+    """
+    year, month = window_start.split("-")
+    y, m = int(year), int(month)
+    if m == 12:
+        next_y, next_m = y + 1, 1
+    else:
+        next_y, next_m = y, m + 1
+    last_day = (datetime(next_y, next_m, 1) - datetime(y, m, 1)).days
+    return f"{y:04d}-{m:02d}-01", f"{y:04d}-{m:02d}-{last_day:02d}"
 
 
 def generate_monthly_windows(
@@ -133,6 +151,7 @@ def generate_monthly_windows(
 def ensure_dirs(cfg: PipelineConfig) -> None:
     for path in [
         cfg.raw_api_path / "openalex",
+        cfg.raw_api_path / "crossref",
         cfg.raw_api_path / "gdelt",
         cfg.interim_path,
         cfg.processed_path,

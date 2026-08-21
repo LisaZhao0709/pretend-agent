@@ -26,10 +26,14 @@ class ForecastConfig:
 
     @property
     def topics(self) -> dict[str, dict[str, Any]]:
-        academic = self.raw["openalex"]["topics"]
+        # Prefer CrossRef topics (enabled replacement for OpenAlex); fall back to OpenAlex
+        if "crossref" in self.raw and self.raw["crossref"].get("enabled", False):
+            academic = self.raw["crossref"]["topics"]
+        else:
+            academic = self.raw["openalex"]["topics"]
         corporate = self.raw["gdelt"]["topics"]
         if set(academic) != set(corporate):
-            raise ValueError("OpenAlex and GDELT must define the same topic keys")
+            raise ValueError("Academic and GDELT must define the same topic keys")
         return academic
 
 
@@ -41,7 +45,10 @@ def load_config(path: str | Path) -> ForecastConfig:
         raw = yaml.safe_load(handle)
     if not isinstance(raw, dict):
         raise ValueError("Configuration root must be a mapping")
-    required = {"version", "paths", "http", "openalex", "gdelt", "scoring"}
+    required = {"version", "paths", "http", "gdelt", "scoring"}
+    # At least one academic source must be present
+    if "openalex" not in raw and "crossref" not in raw:
+        raise ValueError("Configuration must define either 'openalex' or 'crossref' academic source")
     missing = required.difference(raw)
     if missing:
         raise ValueError(f"Missing configuration sections: {sorted(missing)}")

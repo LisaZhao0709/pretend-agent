@@ -53,7 +53,7 @@ def linear_regression_forecast(
 
 def forecast_topic(
     pivot_rows: list[dict[str, Any]],
-    column: str = "openalex_count",
+    column: str = "crossref_count",
     method: str = "moving_average",
     window: int = 3,
     train_ratio: float = 0.7,
@@ -65,7 +65,7 @@ def forecast_topic(
 
     Args:
         pivot_rows: List of pivot table rows for one topic.
-        column: Which count column to predict ("openalex_count" or "gdelt_count").
+        column: Which count column to predict ("crossref_count" or "gdelt_count").
         method: "moving_average" or "linear_regression".
         window: Window size for moving average.
         train_ratio: Fraction of data used as initial training set.

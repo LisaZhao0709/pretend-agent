@@ -50,6 +50,7 @@ def _check_data_quality(
         - topics_with_data: list of topic_ids that have any non-zero count
         - topics_without_data: list of topic_ids with all-zero counts
         - has_openalex: bool, any topic has non-zero openalex_count
+        - has_crossref: bool, any topic has non-zero crossref_count
         - has_gdelt: bool, any topic has non-zero gdelt_count
         - valid_signals: count of non-zero signals (0, 1, or 2)
         - passed: bool, whether quality meets threshold
@@ -64,23 +65,30 @@ def _check_data_quality(
     topics_with_data: list[str] = []
     topics_without_data: list[str] = []
     has_openalex = False
+    has_crossref = False
     has_gdelt = False
 
     for tid, rows in by_topic.items():
-        oa_vals = [r["openalex_count"] for r in rows]
+        oa_vals = [r.get("openalex_count", 0) for r in rows]
+        cr_vals = [r.get("crossref_count", 0) for r in rows]
         gd_vals = [r["gdelt_count"] for r in rows]
         oa_has = any(v > 0 for v in oa_vals)
+        cr_has = any(v > 0 for v in cr_vals)
         gd_has = any(v > 0 for v in gd_vals)
-        if oa_has or gd_has:
+        if oa_has or cr_has or gd_has:
             topics_with_data.append(tid)
         else:
             topics_without_data.append(tid)
         if oa_has:
             has_openalex = True
+        if cr_has:
+            has_crossref = True
         if gd_has:
             has_gdelt = True
 
-    valid_signals = sum([has_openalex, has_gdelt])
+    # Count academic (openalex OR crossref) + gdelt as the two signal classes
+    has_academic = has_openalex or has_crossref
+    valid_signals = sum([has_academic, has_gdelt])
     passed = (
         len(topics_with_data) >= MIN_TOPICS_WITH_DATA
         and valid_signals >= MIN_SIGNALS_WITH_DATA
@@ -90,6 +98,7 @@ def _check_data_quality(
         "topics_with_data": topics_with_data,
         "topics_without_data": topics_without_data,
         "has_openalex": has_openalex,
+        "has_crossref": has_crossref,
         "has_gdelt": has_gdelt,
         "valid_signals": valid_signals,
         "passed": passed,
@@ -115,6 +124,7 @@ def _write_insufficient_report(
         f"- 有数据的主题数: {len(quality['topics_with_data'])} (要求 >= {MIN_TOPICS_WITH_DATA})",
         f"- 有效信号源数: {quality['valid_signals']} (要求 >= {MIN_SIGNALS_WITH_DATA})",
         f"- OpenAlex 论文数据: {'有' if quality['has_openalex'] else '无'}",
+        f"- CrossRef 论文数据: {'有' if quality['has_crossref'] else '无'}",
         f"- GDELT 新闻数据: {'有' if quality['has_gdelt'] else '无'}",
         "",
         "### 有数据的主题",
@@ -140,7 +150,7 @@ def _write_insufficient_report(
         "## 下一步",
         "",
         "1. 等待 API 限流重置后重新运行 pipeline",
-        "2. 确认 OpenAlex 和 GDELT 两个数据源都有非零数据",
+        "2. 确认 CrossRef（或 OpenAlex）和 GDELT 两个数据源都有非零数据",
         "3. 确认至少 3 个主题有有效数据",
         "4. 数据质量达标后，AI 分析报告将自动生成",
         "",
@@ -195,7 +205,8 @@ def _build_data_summary(
     for tid, rows in sorted(by_topic.items()):
         rows_sorted = sorted(rows, key=lambda r: r["window_start"])
         label = rows_sorted[0]["topic_label"]
-        oa_values = [r["openalex_count"] for r in rows_sorted]
+        oa_values = [r.get("openalex_count", 0) for r in rows_sorted]
+        cr_values = [r.get("crossref_count", 0) for r in rows_sorted]
         gd_values = [r["gdelt_count"] for r in rows_sorted]
         time_range = f"{rows_sorted[0]['window_start']} ~ {rows_sorted[-1]['window_start']}"
 
@@ -210,6 +221,15 @@ def _build_data_summary(
             )
         else:
             lines.append("- OpenAlex 论文计数: 全部为 0（数据未采集或限流）")
+        if any(v > 0 for v in cr_values):
+            lines.append(
+                f"- CrossRef 论文计数: min={min(cr_values)}, "
+                f"max={max(cr_values)}, "
+                f"mean={sum(cr_values)/len(cr_values):.1f}, "
+                f"首5月={cr_values[:5]}, 末5月={cr_values[-5:]}"
+            )
+        else:
+            lines.append("- CrossRef 论文计数: 全部为 0（数据未采集或限流）")
         if any(v > 0 for v in gd_values):
             lines.append(
                 f"- GDELT 新闻计数: min={min(gd_values)}, "

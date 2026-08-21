@@ -14,19 +14,45 @@ paths:
 http:
   user_agent: "PredictiveAgentsResearch/00"
   contact_email_env: PROJECT_CONTACT_EMAIL
-  timeout_seconds: 15
-  max_retries: 1
-  min_interval_seconds: 2.0
-  backoff_factor_seconds: 3.0
-  max_backoff_seconds: 20.0
-  max_retry_after_seconds: 60.0
-  jitter_seconds: 0.5
+  timeout_seconds: 30
+  max_retries: 3
+  min_interval_seconds: 6.0
+  backoff_factor_seconds: 20.0
+  max_backoff_seconds: 90.0
+  max_retry_after_seconds: 120.0
+  jitter_seconds: 1.5
   respect_retry_after: true
 
 openalex:
   base_url: https://api.openalex.org/works
   api_key_env: OPENALEX_API_KEY
   per_page: 1
+  enabled: false  # Disabled: group_by=publication_date returns empty + 429 credits paywall
+  topics:
+    ai_agents:
+      label: AI Agents
+      query: '"AI agent" OR "AI agents" OR "agentic AI" OR "autonomous agent"'
+    large_language_models:
+      label: Large Language Models
+      query: '"large language model" OR "large language models" OR LLM'
+    embodied_intelligence:
+      label: Embodied Intelligence
+      query: '"embodied intelligence" OR "embodied AI"'
+    robotics:
+      label: Robotics
+      query: robotics OR robot
+    quantum_computing:
+      label: Quantum Computing
+      query: '"quantum computing" OR "quantum computer"'
+    metaverse:
+      label: Metaverse
+      query: metaverse
+
+crossref:
+  base_url: https://api.crossref.org/works
+  mailto_env: CROSSREF_MAILTO
+  mailto_default: research@example.com
+  enabled: true
   topics:
     ai_agents:
       label: AI Agents

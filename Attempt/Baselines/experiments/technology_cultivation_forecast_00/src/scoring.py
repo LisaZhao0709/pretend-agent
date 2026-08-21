@@ -101,9 +101,16 @@ def score_snapshot(records: Iterable[dict[str, Any]], scoring_config: dict[str, 
     corporate_weight = float(scoring_config["corporate_weight"])
     weight_total = academic_weight + corporate_weight
     for item in combined.values():
-        academic = max(float(item.get("openalex_score", 0.0)), 0.0)
+        # Prefer crossref_score (enabled replacement); fall back to openalex_score
+        academic = 0.0
+        has_academic = False
+        if "crossref_score" in item:
+            academic = max(float(item["crossref_score"]), 0.0)
+            has_academic = True
+        elif "openalex_score" in item:
+            academic = max(float(item["openalex_score"]), 0.0)
+            has_academic = True
         corporate = max(float(item.get("gdelt_score", 0.0)), 0.0)
-        has_academic = "openalex_score" in item
         has_corporate = "gdelt_score" in item
         if has_academic and has_corporate:
             if academic > 0 and corporate > 0:

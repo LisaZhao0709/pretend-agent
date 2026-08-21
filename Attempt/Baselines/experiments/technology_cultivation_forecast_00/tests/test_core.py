@@ -33,7 +33,7 @@ def test_cache_name_is_stable(tmp_path: Path) -> None:
 
 def test_score_and_evaluate() -> None:
     records = []
-    for source in ("openalex", "gdelt"):
+    for source in ("crossref", "gdelt"):
         for topic_id, values in (("rising", [1, 2, 4, 8]), ("flat", [4, 4, 4, 4])):
             for index, value in enumerate(values):
                 records.append(
@@ -58,9 +58,9 @@ def test_score_and_evaluate() -> None:
     assert ranking[0]["topic_id"] == "rising"
     assert ranking[0]["data_status"] == "complete"
     evaluation = evaluate_ranking(ranking, [
-        {"source": "openalex", "topic_id": "rising", "activity_count": 10},
+        {"source": "crossref", "topic_id": "rising", "activity_count": 10},
         {"source": "gdelt", "topic_id": "rising", "activity_count": 10},
-        {"source": "openalex", "topic_id": "flat", "activity_count": 1},
+        {"source": "crossref", "topic_id": "flat", "activity_count": 1},
         {"source": "gdelt", "topic_id": "flat", "activity_count": 1},
     ])
     assert evaluation["top1_topic_id"] == "rising"
@@ -73,7 +73,7 @@ def test_partial_source_does_not_create_joint_score() -> None:
         for index, value in enumerate(values):
             records.append(
                 {
-                    "source": "openalex",
+                    "source": "crossref",
                     "topic_id": topic_id,
                     "topic_label": topic_id,
                     "window_start": f"2026-01-{index * 15 + 1:02d}",

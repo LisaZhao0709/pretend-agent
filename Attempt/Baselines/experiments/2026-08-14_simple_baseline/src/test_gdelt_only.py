@@ -23,7 +23,9 @@ from config import (
     generate_monthly_windows,
     load_pipeline_config,
 )
-from data_collectors.gdelt_client import collect_gdelt_topic
+import yaml as _yaml
+import data_collectors.gdelt  # noqa: F401 - registers collector
+from data_collectors.base import get_collector
 from processors.normalize import (
     create_pivot_table,
     merge_records_by_source,
@@ -48,19 +50,21 @@ def main() -> None:
     print("Phase 1: GDELT Data Collection (cached)")
     print("=" * 60)
 
+    sources_yaml = ATTEMPT_ROOT / "configs" / "sources.yaml"
+    raw_cfg = {}
+    if sources_yaml.exists():
+        with open(sources_yaml, "r", encoding="utf-8") as f:
+            raw_cfg = _yaml.safe_load(f) or {}
+    http_settings = raw_cfg.get("http", {})
+    gdelt_cfg = raw_cfg.get("sources", {}).get("gdelt", {})
+
     all_gdelt: list[dict] = []
-    for topic in cfg.topics:
-        print(f"  [{topic.topic_id}] {topic.topic_label}")
-        gd_records = collect_gdelt_topic(
-            topic_id=topic.topic_id,
-            topic_label=topic.topic_label,
-            query=topic.gdelt_query,
-            windows=windows,
-            cache_dir=cfg.raw_api_path / "gdelt",
-        )
-        cached_count = sum(1 for r in gd_records if r["cached"])
-        print(f"    GDELT: {len(gd_records)} records ({cached_count} cached)")
-        all_gdelt.extend(gd_records)
+    collector = get_collector("gdelt")
+    gd_records = collector.collect(cfg, http_settings, gdelt_cfg)
+    cached_count = sum(1 for r in gd_records if r.get("cached"))
+    ok_count = sum(1 for r in gd_records if r.get("collection_status") == "ok")
+    print(f"  GDELT: {len(gd_records)} records ({ok_count} ok, {len(gd_records) - ok_count} failed, {cached_count} cached)")
+    all_gdelt.extend(gd_records)
 
     # Phase 2: Normalize
     print("\n" + "=" * 60)

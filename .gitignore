@@ -38,6 +38,7 @@ Attempt/**/run_logs/
 Data/Cache/*
 !Data/Cache/.gitkeep
 Data/Raw/APIs/technology_cultivation_00/*
+Data/Interim/technology_cultivation_00/*
 
 # Notebook-generated state
 .ipynb_checkpoints/

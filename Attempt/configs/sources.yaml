@@ -1,13 +1,32 @@
+# Unified HTTP settings shared by all collectors via PoliteApiClient.
+http:
+  user_agent: "PredictiveAgents/0.1 (research project)"
+  contact_email_env: PROJECT_CONTACT_EMAIL
+  timeout_seconds: 30
+  max_retries: 3
+  min_interval_seconds: 3.0
+  backoff_factor_seconds: 15.0
+  max_backoff_seconds: 90.0
+  max_retry_after_seconds: 120.0
+  jitter_seconds: 1.5
+  respect_retry_after: true
+
 # Per-source switches and parameters
 sources:
   openalex:
+    enabled: false        # Disabled: group_by=publication_date returns empty + 429 credits paywall
+    email: research@example.com   # Override via OPENALEX_EMAIL env var for polite pool
+  crossref:
     enabled: true
+    mailto: research@example.com   # Override via CROSSREF_MAILTO env var for polite pool
   gdelt:
     enabled: true
   github:
     enabled: true
     k_new: 100           # Top-K for newly created repos in the last 7 days per query
     k_active: 50         # Top-K for recently active repos (pushed in last 1 day) per query
+    per_page: 30         # Page size (GitHub max 100; smaller reduces rate pressure)
+    max_pages: 4         # Safety cap per query kind
     delta_7d_threshold: 100  # Stars increase in 7 days to mark as surging (if prior snapshot exists)
     use_llm_summarize: false # Gate LLM summarization for very long descriptions
     llm_daily_cap: 30

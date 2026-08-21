@@ -48,21 +48,40 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
 def merge_records_by_source(
     openalex_records: list[dict[str, Any]],
     gdelt_records: list[dict[str, Any]],
+    crossref_records: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Merge OpenAlex and GDELT records into a single sorted list.
+    """Merge OpenAlex, CrossRef and GDELT records into a single sorted list.
 
     Records are sorted by topic_id, then window_start, then source.
 
     Args:
         openalex_records: Activity records from OpenAlex.
         gdelt_records: Activity records from GDELT.
+        crossref_records: Activity records from CrossRef (optional, may be empty).
 
     Returns:
         Merged and sorted list of all records.
     """
-    merged = openalex_records + gdelt_records
+    if crossref_records is None:
+        crossref_records = []
+    merged = openalex_records + crossref_records + gdelt_records
     merged.sort(key=lambda r: (r["topic_id"], r["window_start"], r["source"]))
     return merged
+
+
+def _safe_count(value: Any) -> int:
+    """Coerce an activity_count value to int, treating None/failed as 0.
+
+    New-schema records carry ``activity_count: None`` when
+    ``collection_status == "failed"``. The pivot table needs numeric counts so
+    downstream quality checks and models do not trip on None comparisons.
+    """
+    if value is None:
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def build_feature_matrix(
@@ -92,14 +111,14 @@ def build_feature_matrix(
 def create_pivot_table(
     records: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Pivot records so each row has one window with both openalex and gdelt counts.
+    """Pivot records so each row has one window with openalex, crossref and gdelt counts.
 
     Args:
         records: Merged activity records.
 
     Returns:
         List of dicts with keys: topic_id, topic_label, window_start,
-        openalex_count, gdelt_count.
+        openalex_count, crossref_count, gdelt_count.
     """
     pivot: dict[tuple[str, str], dict[str, Any]] = {}
     for rec in records:
@@ -110,12 +129,15 @@ def create_pivot_table(
                 "topic_label": rec["topic_label"],
                 "window_start": rec["window_start"],
                 "openalex_count": 0,
+                "crossref_count": 0,
                 "gdelt_count": 0,
             }
         if rec["source"] == "openalex":
-            pivot[key]["openalex_count"] = rec["activity_count"]
+            pivot[key]["openalex_count"] = _safe_count(rec.get("activity_count"))
+        elif rec["source"] == "crossref":
+            pivot[key]["crossref_count"] = _safe_count(rec.get("activity_count"))
         elif rec["source"] == "gdelt":
-            pivot[key]["gdelt_count"] = rec["activity_count"]
+            pivot[key]["gdelt_count"] = _safe_count(rec.get("activity_count"))
 
     result = list(pivot.values())
     result.sort(key=lambda r: (r["topic_id"], r["window_start"]))

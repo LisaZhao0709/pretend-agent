@@ -1,4 +1,4 @@
-"""OpenAlex and GDELT collection adapters."""
+"""OpenAlex, CrossRef and GDELT collection adapters."""
 
 from __future__ import annotations
 
@@ -113,6 +113,22 @@ def collect_gdelt(config: ForecastConfig, as_of: date) -> list[dict[str, Any]]:
                     }
                 )
                 continue
+            # Detect non-JSON responses (GDELT sometimes returns plain-text errors)
+            if "_non_json_body" in response.payload:
+                LOGGER.warning("GDELT returned non-JSON response for %s %s..%s: %s", topic_id, start, end, response.payload["_non_json_body"][:100])
+                results.append(
+                    {
+                        "source": "gdelt",
+                        "topic_id": topic_id,
+                        "topic_label": topic["label"],
+                        "window_start": start.isoformat(),
+                        "window_end": end.isoformat(),
+                        "activity_count": None,
+                        "collection_status": "failed",
+                        "error": f"non-JSON response: {response.payload['_non_json_body'][:100]}",
+                    }
+                )
+                continue
             timeline = response.payload.get("timeline") or response.payload.get("data") or []
             activity_count = sum(_timeline_value(point) for point in timeline)
             results.append(
@@ -137,6 +153,63 @@ def _timeline_value(point: dict[str, Any]) -> int:
         if key in point:
             return int(float(point[key]))
     return 0
+
+
+def collect_crossref(config: ForecastConfig, as_of: date) -> list[dict[str, Any]]:
+    """Collect publication counts from CrossRef Works API over short windows.
+
+    Uses rows=1 so message.total-results gives the count directly.
+    Replaces OpenAlex which suffers from group_by emptiness and credits paywall.
+    """
+
+    api = config.raw["crossref"]
+    cache_dir = config.paths["raw_api_dir"] / "crossref"
+    client = PoliteApiClient(cache_dir, config.http)
+    mailto_env = api.get("mailto_env", "CROSSREF_MAILTO")
+    mailto = os.getenv(mailto_env, api.get("mailto_default", "research@example.com"))
+    results: list[dict[str, Any]] = []
+    windows = date_windows(as_of, int(config.raw["history_windows"]), int(config.raw["window_days"]))
+
+    for topic_id, topic in config.raw["crossref"]["topics"].items():
+        for start, end in windows:
+            params: dict[str, Any] = {
+                "query": topic["query"],
+                "filter": f"from-pub-date:{start.isoformat()},until-pub-date:{end.isoformat()}",
+                "rows": 1,
+                "mailto": mailto,
+            }
+            try:
+                response = client.get_json(api["base_url"], params, cache_key=f"crossref_{topic_id}_{start}_{end}")
+            except Exception as exc:  # noqa: BLE001 - collection must preserve partial progress
+                LOGGER.warning("CrossRef request failed for %s %s..%s: %s", topic_id, start, end, exc)
+                results.append(
+                    {
+                        "source": "crossref",
+                        "topic_id": topic_id,
+                        "topic_label": topic["label"],
+                        "window_start": start.isoformat(),
+                        "window_end": end.isoformat(),
+                        "activity_count": None,
+                        "collection_status": "failed",
+                        "error": str(exc),
+                    }
+                )
+                continue
+            message = response.payload.get("message", {})
+            count = int(message.get("total-results", 0))
+            results.append(
+                {
+                    "source": "crossref",
+                    "topic_id": topic_id,
+                    "topic_label": topic["label"],
+                    "window_start": start.isoformat(),
+                    "window_end": end.isoformat(),
+                    "activity_count": count,
+                    "collection_status": "ok",
+                    "collected_at": response.fetched_at,
+                }
+            )
+    return results
 
 
 def write_records(records: list[dict[str, Any]], path: str | Path) -> Path:

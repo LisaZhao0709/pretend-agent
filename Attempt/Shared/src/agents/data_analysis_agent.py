@@ -88,14 +88,16 @@ class DataAnalysisAgent(BaseAgent):
         try:
             # Load collected records
             openalex_path = self.cfg.interim_path / "openalex_records.jsonl"
+            crossref_path = self.cfg.interim_path / "crossref_records.jsonl"
             gdelt_path = self.cfg.interim_path / "gdelt_records.jsonl"
 
             openalex_recs = load_jsonl(openalex_path) if openalex_path.exists() else []
+            crossref_recs = load_jsonl(crossref_path) if crossref_path.exists() else []
             gdelt_recs = load_jsonl(gdelt_path) if gdelt_path.exists() else []
 
             # Merge and pivot
             from processors.normalize import merge_records_by_source
-            merged = merge_records_by_source(openalex_recs, gdelt_recs)
+            merged = merge_records_by_source(openalex_recs, gdelt_recs, crossref_recs)
             pivot = create_pivot_table(merged)
 
             # Load and merge GitHub signals

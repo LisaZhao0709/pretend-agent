@@ -1,8 +1,9 @@
 """DataCollectionAgent orchestrates multi-source collection and persistence.
 
-- Iterates topics and enabled sources
-- Uses SearchTool to collect
-- Writes a simple collection_report.json into Reports
+Config-driven: iterates sources enabled in ``sources.yaml`` and dispatches to
+the registered :class:`~data_collectors.base.SourceCollector`. Per-source
+failures are captured in the report without aborting the whole run. Collected
+records are persisted to interim JSONL, one file per source.
 """
 
 from __future__ import annotations
@@ -16,9 +17,15 @@ from typing import Any
 import yaml
 
 from config import PipelineConfig, ensure_dirs
-from tools.search_tool import search
 from processors.normalize import save_records_to_jsonl
 from agents.base_agent import BaseAgent, AgentResult
+
+# Importing the collector modules registers them with the registry.
+import data_collectors.crossref  # noqa: F401
+import data_collectors.openalex  # noqa: F401
+import data_collectors.gdelt      # noqa: F401
+import data_collectors.github     # noqa: F401
+from data_collectors.base import get_collector, registered_sources
 
 
 @dataclass
@@ -37,80 +44,76 @@ class DataCollectionAgent(BaseAgent):
 
     def run(self) -> AgentResult:
         ensure_dirs(self.cfg)
-        sources_cfg = self._load_sources_cfg().get("sources", {})
-        attempt_root = self.opts.sources_cfg_path.parent.parent.parent
+        raw_cfg = self._load_sources_cfg()
+        http_settings = raw_cfg.get("http", {})
+        sources_cfg = raw_cfg.get("sources", {})
 
         report = {
             "dataset": self.cfg.dataset_name,
             "started_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "registered_sources": registered_sources(),
             "by_topic": [],
+            "by_source": {},
         }
 
         # Accumulate records by source for batch persistence
-        all_openalex: list[dict[str, Any]] = []
-        all_gdelt: list[dict[str, Any]] = []
+        records_by_source: dict[str, list[dict[str, Any]]] = {}
 
-        for topic in self.cfg.topics:
-            entry = {"topic_id": topic.topic_id, "topic_label": topic.topic_label, "sources": {}}
+        for source_name, source_cfg in sources_cfg.items():
+            if not source_cfg.get("enabled", False):
+                report["by_source"][source_name] = {"enabled": False}
+                continue
+            try:
+                collector = get_collector(source_name)
+            except ValueError as exc:
+                report["by_source"][source_name] = {"enabled": True, "error": str(exc)}
+                continue
 
-            # OpenAlex
-            if sources_cfg.get("openalex", {}).get("enabled", True):
-                try:
-                    recs = search(
-                        source="openalex",
-                        topic_id=topic.topic_id,
-                        topic_label=topic.topic_label,
-                        query=topic.openalex_query,
-                        cfg=self.cfg,
-                        attempt_root=attempt_root,
-                    )
-                    all_openalex.extend(recs)
-                    entry["sources"]["openalex"] = {"records": len(recs)}
-                except Exception as e:  # noqa: BLE001
-                    entry["sources"]["openalex"] = {"error": str(e)}
+            try:
+                recs = collector.collect(self.cfg, http_settings, source_cfg)
+            except Exception as exc:  # noqa: BLE001 - one source failing must not abort others
+                report["by_source"][source_name] = {
+                    "enabled": True,
+                    "error": str(exc),
+                    "records": 0,
+                    "failed": 0,
+                }
+                continue
 
-            # GDELT
-            if sources_cfg.get("gdelt", {}).get("enabled", True):
-                try:
-                    recs = search(
-                        source="gdelt",
-                        topic_id=topic.topic_id,
-                        topic_label=topic.topic_label,
-                        query=topic.gdelt_query,
-                        cfg=self.cfg,
-                        attempt_root=attempt_root,
-                    )
-                    all_gdelt.extend(recs)
-                    entry["sources"]["gdelt"] = {"records": len(recs)}
-                except Exception as e:  # noqa: BLE001
-                    entry["sources"]["gdelt"] = {"error": str(e)}
+            records_by_source[source_name] = recs
+            ok_count = sum(1 for r in recs if r.get("collection_status") == "ok")
+            failed_count = sum(1 for r in recs if r.get("collection_status") != "ok")
+            report["by_source"][source_name] = {
+                "enabled": True,
+                "records": len(recs),
+                "ok": ok_count,
+                "failed": failed_count,
+            }
 
-            # GitHub
-            gh_cfg = sources_cfg.get("github", {})
-            if gh_cfg.get("enabled", True):
-                try:
-                    recs = search(
-                        source="github",
-                        topic_id=topic.topic_id,
-                        topic_label=topic.topic_label,
-                        query=topic.topic_label,  # placeholder: mapping to topic later if needed
-                        cfg=self.cfg,
-                        attempt_root=attempt_root,
-                    )
-                    entry["sources"]["github"] = {
-                        "records": len(recs),
-                        "date": recs[0]["window_start"] if recs else None,
+        # Build per-topic summary from all collected records
+        topic_summary: dict[str, dict[str, Any]] = {}
+        for source_name, recs in records_by_source.items():
+            for rec in recs:
+                tid = rec.get("topic_id", "unknown")
+                if tid not in topic_summary:
+                    topic_summary[tid] = {
+                        "topic_id": tid,
+                        "topic_label": rec.get("topic_label", tid),
+                        "sources": {},
                     }
-                except Exception as e:  # noqa: BLE001
-                    entry["sources"]["github"] = {"error": str(e)}
+                src_entry = topic_summary[tid]["sources"].setdefault(source_name, {"ok": 0, "failed": 0})
+                if rec.get("collection_status") == "ok":
+                    src_entry["ok"] += 1
+                else:
+                    src_entry["failed"] += 1
+                    src_entry.setdefault("errors", []).append(rec.get("error", "unknown"))
+        report["by_topic"] = list(topic_summary.values())
 
-            report["by_topic"].append(entry)
-
-        # Persist collected records to interim
-        if all_openalex:
-            save_records_to_jsonl(all_openalex, self.cfg.interim_path / "openalex_records.jsonl")
-        if all_gdelt:
-            save_records_to_jsonl(all_gdelt, self.cfg.interim_path / "gdelt_records.jsonl")
+        # Persist collected records to interim, one file per source
+        for source_name, recs in records_by_source.items():
+            if recs:
+                out_path = self.cfg.interim_path / f"{source_name}_records.jsonl"
+                save_records_to_jsonl(recs, out_path)
 
         report["finished_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
         out = self.cfg.reports_path / "collection_report.json"
