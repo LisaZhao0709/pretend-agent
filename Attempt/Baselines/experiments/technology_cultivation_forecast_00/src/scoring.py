@@ -32,13 +32,50 @@ def _normalize(values: dict[str, float]) -> dict[str, float]:
     return {key: (value - low) / (high - low) for key, value in values.items()}
 
 
+def _aggregate_github_to_monthly(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Aggregate daily GitHub snapshot records into monthly windows.
+
+    GitHub collector produces daily snapshots (window_start = YYYY-MM-DD).
+    Other sources use monthly windows (YYYY-MM). This function takes the
+    latest daily snapshot within each month as the monthly value, so that
+    growth/acceleration features are computed on a comparable time scale.
+    """
+    by_month: dict[str, dict[str, Any]] = {}
+    for rec in records:
+        day_str = rec.get("window_start", "")
+        if len(day_str) >= 7:
+            month = day_str[:7]  # YYYY-MM
+        else:
+            continue
+        existing = by_month.get(month)
+        if existing is None or day_str > existing.get("window_start", ""):
+            by_month[month] = {
+                **rec,
+                "window_start": month,
+                "window_end": month,
+            }
+    return sorted(by_month.values(), key=lambda r: r["window_start"])
+
+
 def score_snapshot(records: Iterable[dict[str, Any]], scoring_config: dict[str, Any]) -> list[dict[str, Any]]:
     """Score the latest window for every source and topic."""
 
-    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
-    for record in records:
-        if record.get("collection_status", "ok") != "ok" or record.get("activity_count") is None:
+    # Separate GitHub daily records for monthly aggregation
+    raw_records = list(records)
+    github_daily: list[dict[str, Any]] = []
+    other_records: list[dict[str, Any]] = []
+    for rec in raw_records:
+        if rec.get("collection_status", "ok") != "ok" or rec.get("activity_count") is None:
             continue
+        if rec.get("source") == "github":
+            github_daily.append(rec)
+        else:
+            other_records.append(rec)
+
+    github_monthly = _aggregate_github_to_monthly(github_daily)
+
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for record in other_records + github_monthly:
         key = (record["source"], record["topic_id"])
         grouped.setdefault(key, []).append(record)
 
@@ -99,7 +136,11 @@ def score_snapshot(records: Iterable[dict[str, Any]], scoring_config: dict[str, 
     output: list[dict[str, Any]] = []
     academic_weight = float(scoring_config["academic_weight"])
     corporate_weight = float(scoring_config["corporate_weight"])
-    weight_total = academic_weight + corporate_weight
+    community_weight = float(scoring_config.get("community_weight", 0.0))
+    weight_total = academic_weight + corporate_weight + community_weight
+    if weight_total <= 0:
+        raise ValueError("Scoring weights must sum to a positive value")
+
     for item in combined.values():
         # Prefer crossref_score (enabled replacement); fall back to openalex_score
         academic = 0.0
@@ -112,16 +153,35 @@ def score_snapshot(records: Iterable[dict[str, Any]], scoring_config: dict[str, 
             has_academic = True
         corporate = max(float(item.get("gdelt_score", 0.0)), 0.0)
         has_corporate = "gdelt_score" in item
-        if has_academic and has_corporate:
-            if academic > 0 and corporate > 0:
-                joint = math.exp((academic_weight * math.log(academic) + corporate_weight * math.log(corporate)) / weight_total)
-            else:
-                joint = 0.0
+        community = max(float(item.get("github_score", 0.0)), 0.0)
+        has_community = "github_score" in item
+
+        # Build weighted geometric mean from available sources
+        components: list[tuple[float, float]] = []
+        if has_academic:
+            components.append((academic, academic_weight))
+        if has_corporate:
+            components.append((corporate, corporate_weight))
+        if has_community and community_weight > 0:
+            components.append((community, community_weight))
+
+        if len(components) >= 2:
+            log_sum = 0.0
+            w_sum = 0.0
+            for value, weight in components:
+                if value > 0:
+                    log_sum += weight * math.log(value)
+                    w_sum += weight
+            joint = math.exp(log_sum / w_sum) if w_sum > 0 else 0.0
+        elif len(components) == 1:
+            joint = components[0][0]
         else:
             joint = None
+
+        source_count = sum([has_academic, has_corporate, has_community])
         output.append({
             **item,
-            "data_status": "complete" if has_academic and has_corporate else "partial",
+            "data_status": "complete" if source_count >= 3 else ("partial" if source_count >= 1 else "empty"),
             "joint_score": joint,
         })
     return sorted(output, key=lambda item: item["joint_score"] if item["joint_score"] is not None else -1.0, reverse=True)
@@ -130,10 +190,22 @@ def score_snapshot(records: Iterable[dict[str, Any]], scoring_config: dict[str, 
 def evaluate_ranking(predictions: list[dict[str, Any]], future_records: Iterable[dict[str, Any]]) -> dict[str, Any]:
     """Evaluate whether predicted topics had higher future activity."""
 
-    source_topic_activity: dict[tuple[str, str], float] = {}
-    for record in future_records:
-        if record.get("collection_status", "ok") != "ok" or record.get("activity_count") is None:
+    # Aggregate GitHub daily records to monthly for consistency
+    raw_future = list(future_records)
+    github_daily_future: list[dict[str, Any]] = []
+    other_future: list[dict[str, Any]] = []
+    for rec in raw_future:
+        if rec.get("collection_status", "ok") != "ok" or rec.get("activity_count") is None:
             continue
+        if rec.get("source") == "github":
+            github_daily_future.append(rec)
+        else:
+            other_future.append(rec)
+    github_monthly_future = _aggregate_github_to_monthly(github_daily_future)
+    all_future = other_future + github_monthly_future
+
+    source_topic_activity: dict[tuple[str, str], float] = {}
+    for record in all_future:
         key = (record["source"], record["topic_id"])
         source_topic_activity[key] = source_topic_activity.get(key, 0.0) + float(record["activity_count"])
     by_source: dict[str, dict[str, float]] = {}

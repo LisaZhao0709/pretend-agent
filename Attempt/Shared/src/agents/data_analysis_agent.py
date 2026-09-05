@@ -23,54 +23,55 @@ class DataAnalysisAgent(BaseAgent):
     def __init__(self, cfg: PipelineConfig) -> None:
         self.cfg = cfg
 
-    def _load_github_signals(self) -> dict[str, dict[str, Any]]:
-        """Load latest github_signals_YYYY-MM-DD.jsonl snapshot."""
+    def _load_github_signals(self) -> list[dict[str, Any]]:
+        """Load latest github_signals_YYYY-MM-DD.jsonl snapshot as a list.
+
+        Signals are topic-specific; a repo may appear under multiple topics,
+        so we keep all records rather than deduplicating by repo_id.
+        """
         interim = self.cfg.interim_path
         if not interim.exists():
-            return {}
+            return []
 
         # Find latest github_signals file
         candidates = sorted(interim.glob("github_signals_*.jsonl"), reverse=True)
         if not candidates:
-            return {}
+            return []
 
-        signals: dict[str, dict[str, Any]] = {}
+        signals: list[dict[str, Any]] = []
         with open(candidates[0], "r", encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     rec = json.loads(line)
-                    rid = rec.get("repo_id")
-                    if rid:
-                        signals[rid] = rec
+                    signals.append(rec)
         return signals
 
     def _extend_pivot_with_github(
         self,
         pivot: list[dict[str, Any]],
-        gh_signals: dict[str, dict[str, Any]],
+        gh_signals: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Add github_* columns to pivot table.
 
-        GitHub signals are daily snapshots; we aggregate them by month to match pivot windows.
+        GitHub signals are daily snapshots with topic_id; we aggregate them by
+        (topic_id, month) to match pivot windows.
         """
-        # Group signals by month (extract from created_at or use latest snapshot)
-        gh_by_month: dict[str, list[dict[str, Any]]] = {}
+        # Group signals by (topic_id, month)
+        gh_by_topic_month: dict[tuple[str, str], list[dict[str, Any]]] = {}
         for sig in gh_signals.values():
-            # Signals have created_at as YYYY-MM-DDTHH:MM:SSZ or similar; extract month
+            tid = sig.get("topic_id", "unknown")
             date_str = sig.get("created_at", "")
             if date_str:
                 month = date_str[:7]  # YYYY-MM
             else:
-                # Fallback: use the snapshot date from _window or assume current month
                 month = "unknown"
-            if month not in gh_by_month:
-                gh_by_month[month] = []
-            gh_by_month[month].append(sig)
+            gh_by_topic_month.setdefault((tid, month), []).append(sig)
 
         # Extend pivot
         for row in pivot:
+            tid = row.get("topic_id", "")
             month = row.get("window_start", "")
-            sigs = gh_by_month.get(month, [])
+            sigs = gh_by_topic_month.get((tid, month), [])
             if sigs:
                 row["github_stars_total"] = sum(s.get("stars_total", 0) for s in sigs)
                 row["github_stars_per_day"] = sum(s.get("stars_per_day_lifetime", 0) for s in sigs)
@@ -90,14 +91,16 @@ class DataAnalysisAgent(BaseAgent):
             openalex_path = self.cfg.interim_path / "openalex_records.jsonl"
             crossref_path = self.cfg.interim_path / "crossref_records.jsonl"
             gdelt_path = self.cfg.interim_path / "gdelt_records.jsonl"
+            github_path = self.cfg.interim_path / "github_records.jsonl"
 
             openalex_recs = load_jsonl(openalex_path) if openalex_path.exists() else []
             crossref_recs = load_jsonl(crossref_path) if crossref_path.exists() else []
             gdelt_recs = load_jsonl(gdelt_path) if gdelt_path.exists() else []
+            github_recs = load_jsonl(github_path) if github_path.exists() else []
 
             # Merge and pivot
             from processors.normalize import merge_records_by_source
-            merged = merge_records_by_source(openalex_recs, gdelt_recs, crossref_recs)
+            merged = merge_records_by_source(openalex_recs, gdelt_recs, crossref_recs, github_recs)
             pivot = create_pivot_table(merged)
 
             # Load and merge GitHub signals

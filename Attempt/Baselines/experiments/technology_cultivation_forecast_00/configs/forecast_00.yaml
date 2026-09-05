@@ -98,8 +98,9 @@ gdelt:
       query: metaverse
 
 scoring:
-  academic_weight: 0.5
-  corporate_weight: 0.5
+  academic_weight: 0.4
+  corporate_weight: 0.35
+  community_weight: 0.25
   growth_weight: 0.45
   acceleration_weight: 0.25
   persistence_weight: 0.20

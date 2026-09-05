@@ -1,13 +1,16 @@
 """GitHub REST collector for trending repository signals (public only).
 
-Uses the ``search/repositories`` endpoint with two windows:
-1) ``created:>=D-7`` sorted by stars desc (new repos)
-2) ``pushed:>=D-1`` sorted by stars desc (active repos)
+Uses the ``search/repositories`` endpoint with two windows per topic:
+1) ``{topic_query} created:>=D-7`` sorted by stars desc (new repos)
+2) ``{topic_query} pushed:>=D-1`` sorted by stars desc (active repos)
+
+Each topic uses its own ``github_query`` from ``topics.yaml`` so that repo
+signals are topic-specific rather than shared across all topics.
 
 Supports optional authentication via ``GITHUB_TOKEN``. Caches raw responses
 through :class:`~http_client.PoliteApiClient` and writes minimal interim JSONL
 snapshots (repos + derived signals). Returns one synthetic activity record per
-topic so the agent/report can count the daily snapshot uniformly.
+topic with topic-specific signal counts.
 """
 
 from __future__ import annotations
@@ -58,7 +61,7 @@ def _iso_to_dt(s: str) -> datetime:
     return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
 
 
-def _extract_minimal_repo(item: dict[str, Any]) -> dict[str, Any]:
+def _extract_minimal_repo(item: dict[str, Any], topic_id: str = "", topic_label: str = "") -> dict[str, Any]:
     owner = item.get("owner") or {}
     license_info = item.get("license") or {}
     return {
@@ -80,6 +83,8 @@ def _extract_minimal_repo(item: dict[str, Any]) -> dict[str, Any]:
         "archived": item.get("archived", False),
         "disabled": item.get("disabled", False),
         "homepage": item.get("homepage"),
+        "topic_id": topic_id,
+        "topic_label": topic_label,
     }
 
 
@@ -138,107 +143,140 @@ class GithubCollector:
         created_since = _day_str(now - timedelta(days=7))
         pushed_since = _day_str(now - timedelta(days=1))
 
-        results: list[dict[str, Any]] = []
+        all_repos: list[dict[str, Any]] = []
+        all_signals: list[dict[str, Any]] = []
         fetch_errors: list[str] = []
-
-        for q, topk, tag in [
-            (f"created:>={created_since}", k_new, "new"),
-            (f"pushed:>={pushed_since}", k_active, "active"),
-        ]:
-            page = 1
-            kept = 0
-            while kept < topk and page <= max_pages:
-                this_per = min(per_page, topk - kept)
-                params = {
-                    "q": q,
-                    "sort": "stars",
-                    "order": "desc",
-                    "per_page": this_per,
-                    "page": page,
-                }
-                cache_key = f"github_{tag}_{day}_p{page}"
-                try:
-                    response = client.get_json(
-                        SEARCH_REPOS, params, cache_key=cache_key, extra_headers=headers,
-                    )
-                except Exception as exc:  # noqa: BLE001 - preserve partial progress
-                    fetch_errors.append(f"{tag} page {page}: {exc}")
-                    break
-
-                if isinstance(response.payload, dict) and "_non_json_body" in response.payload:
-                    fetch_errors.append(f"{tag} page {page}: non-JSON {response.payload['_non_json_body'][:80]}")
-                    break
-
-                items = response.payload.get("items", []) if isinstance(response.payload, dict) else []
-                for item in items:
-                    rec = _extract_minimal_repo(item)
-                    if lang_whitelist and rec.get("language") not in lang_whitelist:
-                        continue
-                    if org_whitelist and rec.get("owner_login") not in org_whitelist:
-                        continue
-                    rec["_window"] = tag
-                    results.append(rec)
-                    kept += 1
-                    if kept >= topk:
-                        break
-                if not items:
-                    break
-                page += 1
-
-        # Deduplicate by repo_id keeping max stargazers_count
-        seen: dict[int, dict[str, Any]] = {}
-        for r in results:
-            rid = int(r.get("repo_id") or 0)
-            if rid not in seen or (r.get("stargazers_count", 0) > seen[rid].get("stargazers_count", 0)):
-                seen[rid] = r
-        deduped = list(seen.values())
-
-        repos_path = interim_dir / f"github_repos_{day}.jsonl"
-        n_repos = _write_jsonl(repos_path, deduped)
-
-        signals: list[dict[str, Any]] = []
-        for r in deduped:
-            created_at = r.get("created_at")
-            pushed_at = r.get("pushed_at")
-            stars = int(r.get("stargazers_count", 0))
-            days = max(1, int((now - _iso_to_dt(created_at)).days)) if created_at else 1
-            recent = 1 if (pushed_at and (now - _iso_to_dt(pushed_at)).days <= 3) else 0
-            signals.append({
-                "repo_id": r.get("repo_id"),
-                "full_name": r.get("full_name"),
-                "stars_total": stars,
-                "stars_per_day_lifetime": round(stars / days, 3),
-                "forks_total": int(r.get("forks_count", 0)),
-                "activity_recent": recent,
-                "language": r.get("language"),
-                "created_at": created_at,
-                "_window": r.get("_window"),
-            })
-
-        signals_path = interim_dir / f"github_signals_{day}.jsonl"
-        n_signals = _write_jsonl(signals_path, signals)
-
-        # One synthetic record per topic so the report counts the snapshot
-        # uniformly across sources. The real per-repo signals live in interim.
         records: list[dict[str, Any]] = []
-        status = "ok" if not fetch_errors else "partial"
+
         for topic in cfg.topics:
+            topic_query = topic.github_query or topic.openalex_query
+            if not topic_query:
+                fetch_errors.append(f"topic {topic.topic_id}: no github_query configured")
+                records.append({
+                    "source": "github",
+                    "topic_id": topic.topic_id,
+                    "topic_label": topic.topic_label,
+                    "window_start": day,
+                    "window_end": day,
+                    "activity_count": 0,
+                    "collection_status": "failed",
+                    "collected_at": now.isoformat(),
+                    "cached": False,
+                    "error": "no github_query configured",
+                })
+                continue
+
+            topic_repos: list[dict[str, Any]] = []
+            topic_fetch_errors: list[str] = []
+
+            for q_suffix, topk, tag in [
+                (f"created:>={created_since}", k_new, "new"),
+                (f"pushed:>={pushed_since}", k_active, "active"),
+            ]:
+                full_query = f"{topic_query} {q_suffix}"
+                page = 1
+                kept = 0
+                while kept < topk and page <= max_pages:
+                    this_per = min(per_page, topk - kept)
+                    params = {
+                        "q": full_query,
+                        "sort": "stars",
+                        "order": "desc",
+                        "per_page": this_per,
+                        "page": page,
+                    }
+                    cache_key = f"github_{topic.topic_id}_{tag}_{day}_p{page}"
+                    try:
+                        response = client.get_json(
+                            SEARCH_REPOS, params, cache_key=cache_key, extra_headers=headers,
+                        )
+                    except Exception as exc:  # noqa: BLE001 - preserve partial progress
+                        topic_fetch_errors.append(f"{topic.topic_id}/{tag} page {page}: {exc}")
+                        break
+
+                    if isinstance(response.payload, dict) and "_non_json_body" in response.payload:
+                        topic_fetch_errors.append(
+                            f"{topic.topic_id}/{tag} page {page}: non-JSON {response.payload['_non_json_body'][:80]}"
+                        )
+                        break
+
+                    items = response.payload.get("items", []) if isinstance(response.payload, dict) else []
+                    for item in items:
+                        rec = _extract_minimal_repo(item, topic.topic_id, topic.topic_label)
+                        if lang_whitelist and rec.get("language") not in lang_whitelist:
+                            continue
+                        if org_whitelist and rec.get("owner_login") not in org_whitelist:
+                            continue
+                        rec["_window"] = tag
+                        topic_repos.append(rec)
+                        kept += 1
+                        if kept >= topk:
+                            break
+                    if not items:
+                        break
+                    page += 1
+
+            # Deduplicate by repo_id within this topic, keeping max stargazers_count
+            seen: dict[int, dict[str, Any]] = {}
+            for r in topic_repos:
+                rid = int(r.get("repo_id") or 0)
+                if rid not in seen or (r.get("stargazers_count", 0) > seen[rid].get("stargazers_count", 0)):
+                    seen[rid] = r
+            deduped = list(seen.values())
+
+            # Build topic-specific signals
+            topic_signals: list[dict[str, Any]] = []
+            for r in deduped:
+                created_at = r.get("created_at")
+                pushed_at = r.get("pushed_at")
+                stars = int(r.get("stargazers_count", 0))
+                days = max(1, int((now - _iso_to_dt(created_at)).days)) if created_at else 1
+                recent = 1 if (pushed_at and (now - _iso_to_dt(pushed_at)).days <= 3) else 0
+                topic_signals.append({
+                    "repo_id": r.get("repo_id"),
+                    "full_name": r.get("full_name"),
+                    "stars_total": stars,
+                    "stars_per_day_lifetime": round(stars / days, 3),
+                    "forks_total": int(r.get("forks_count", 0)),
+                    "activity_recent": recent,
+                    "language": r.get("language"),
+                    "created_at": created_at,
+                    "topic_id": topic.topic_id,
+                    "topic_label": topic.topic_label,
+                    "_window": r.get("_window"),
+                })
+
+            all_repos.extend(deduped)
+            all_signals.extend(topic_signals)
+            fetch_errors.extend(topic_fetch_errors)
+
+            n_topic_signals = len(topic_signals)
+            status = "ok" if not topic_fetch_errors else "partial"
             records.append({
                 "source": "github",
                 "topic_id": topic.topic_id,
                 "topic_label": topic.topic_label,
                 "window_start": day,
                 "window_end": day,
-                "activity_count": n_signals,
+                "activity_count": n_topic_signals,
                 "collection_status": status,
                 "collected_at": now.isoformat(),
                 "cached": False,
                 "features": {
-                    "repos_snapshot": str(repos_path),
-                    "signals_snapshot": str(signals_path),
-                    "repos_count": n_repos,
-                    "signals_count": n_signals,
-                    "fetch_errors": fetch_errors,
+                    "repos_count": len(deduped),
+                    "signals_count": n_topic_signals,
+                    "stars_total": sum(s["stars_total"] for s in topic_signals),
+                    "forks_total": sum(s["forks_total"] for s in topic_signals),
+                    "activity_recent_count": sum(s["activity_recent"] for s in topic_signals),
+                    "fetch_errors": topic_fetch_errors,
                 },
             })
+
+        # Persist all repos and signals (across all topics) to interim
+        repos_path = interim_dir / f"github_repos_{day}.jsonl"
+        n_repos = _write_jsonl(repos_path, all_repos)
+
+        signals_path = interim_dir / f"github_signals_{day}.jsonl"
+        n_signals = _write_jsonl(signals_path, all_signals)
+
         return records

@@ -29,3 +29,12 @@ Raw -> Interim -> Processed
 ## 最低记录要求
 
 来源、采集方式、采集时间、原始 URL 或 API、许可/使用限制、字段定义、去重规则、清洗步骤、文件哈希和对应实验。
+
+## 云端备份（可选）
+
+`Data/Processed` 支持同步到华为云 OBS 对象存储，作为本地文件之外的云端备份，本地文件始终是数据的唯一权威来源，云端只是备份/共享入口。
+
+- 配置文件：`Attempt/configs/cloud_storage.yaml`（默认 `enabled: false`，需要手动开启）
+- 凭证：在 `.env` 中设置 `HUAWEICLOUD_AK` / `HUAWEICLOUD_SK`（参考 `Attempt/.env.example`），凭证不写入任何配置文件或 Git
+- 代码入口：`Attempt/Shared/src/cloud_storage.py` 提供 `upload_file` / `download_file` / `sync_processed_data`
+- 选型理由和成本估算见项目历史进展记录（华为云 OBS 标准存储约 ¥0.099/GB/月，当前数据量下月成本可忽略；数据量增长到 GB 级后再评估升级到华为云 RDS for PostgreSQL）

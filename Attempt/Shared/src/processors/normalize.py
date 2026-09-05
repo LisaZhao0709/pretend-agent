@@ -49,8 +49,9 @@ def merge_records_by_source(
     openalex_records: list[dict[str, Any]],
     gdelt_records: list[dict[str, Any]],
     crossref_records: list[dict[str, Any]] | None = None,
+    github_records: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Merge OpenAlex, CrossRef and GDELT records into a single sorted list.
+    """Merge OpenAlex, CrossRef, GDELT and GitHub records into a single sorted list.
 
     Records are sorted by topic_id, then window_start, then source.
 
@@ -58,13 +59,16 @@ def merge_records_by_source(
         openalex_records: Activity records from OpenAlex.
         gdelt_records: Activity records from GDELT.
         crossref_records: Activity records from CrossRef (optional, may be empty).
+        github_records: Activity records from GitHub (optional, may be empty).
 
     Returns:
         Merged and sorted list of all records.
     """
     if crossref_records is None:
         crossref_records = []
-    merged = openalex_records + crossref_records + gdelt_records
+    if github_records is None:
+        github_records = []
+    merged = openalex_records + crossref_records + gdelt_records + github_records
     merged.sort(key=lambda r: (r["topic_id"], r["window_start"], r["source"]))
     return merged
 
@@ -131,6 +135,7 @@ def create_pivot_table(
                 "openalex_count": 0,
                 "crossref_count": 0,
                 "gdelt_count": 0,
+                "github_count": 0,
             }
         if rec["source"] == "openalex":
             pivot[key]["openalex_count"] = _safe_count(rec.get("activity_count"))
@@ -138,6 +143,8 @@ def create_pivot_table(
             pivot[key]["crossref_count"] = _safe_count(rec.get("activity_count"))
         elif rec["source"] == "gdelt":
             pivot[key]["gdelt_count"] = _safe_count(rec.get("activity_count"))
+        elif rec["source"] == "github":
+            pivot[key]["github_count"] = _safe_count(rec.get("activity_count"))
 
     result = list(pivot.values())
     result.sort(key=lambda r: (r["topic_id"], r["window_start"]))

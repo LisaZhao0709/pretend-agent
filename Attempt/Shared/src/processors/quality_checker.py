@@ -42,7 +42,7 @@ def check_data_quality(
         openalex_count = sum(1 for r in recs if r.get("openalex_count", 0) > 0)
         crossref_count = sum(1 for r in recs if r.get("crossref_count", 0) > 0)
         gdelt_count = sum(1 for r in recs if r.get("gdelt_count", 0) > 0)
-        github_count = sum(1 for r in recs if r.get("github_stars_total", 0) > 0)
+        github_count = sum(1 for r in recs if r.get("github_count", 0) > 0)
 
         coverage = (openalex_count + crossref_count + gdelt_count + github_count) / (len(recs) * 4) if recs else 0
         report["by_topic"][tid] = {
@@ -61,6 +61,8 @@ def check_data_quality(
             report["issues"].append(f"Topic {tid}: no academic data (OpenAlex and CrossRef both empty)")
         if gdelt_count == 0:
             report["issues"].append(f"Topic {tid}: no GDELT data")
+        if github_count == 0:
+            report["issues"].append(f"Topic {tid}: no GitHub data")
 
     # Overall score
     avg_coverage = sum(t["overall_coverage"] for t in report["by_topic"].values()) / len(report["by_topic"]) if report["by_topic"] else 0

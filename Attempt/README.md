@@ -42,3 +42,12 @@ docs/           # 额外设计说明
 ## 环境
 
 环境定义在本目录根部：`pyproject.toml`、`requirements.txt`、`environment.yml` 和 `.env.example`。虚拟环境目录为 `Attempt/.venv/`，已加入 Git 忽略规则。
+
+## 云端备份（可选）
+
+`configs/cloud_storage.yaml` 定义了华为云 OBS 对象存储的可选同步目标（默认关闭）。开启前需要：
+
+1. 在华为云控制台创建 OBS bucket 并获取 Access Key（AK）/ Secret Key（SK）。
+2. 把 AK/SK 写入本地 `.env`（变量名见 `.env.example` 的 `HUAWEICLOUD_AK` / `HUAWEICLOUD_SK`），绝不提交到 Git。
+3. 把 `cloud_storage.yaml` 中 `huawei_obs.enabled` 改为 `true`，并确认 `bucket` / `endpoint` 与实际 bucket 一致。
+4. 使用 `Shared/src/cloud_storage.py` 中的 `sync_processed_data(pipeline_cfg)` 把 `Data/Processed` 同步到 OBS；本地文件路径逻辑（`PipelineConfig`）不受影响，云同步是纯附加能力。

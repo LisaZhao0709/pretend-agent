@@ -21,3 +21,15 @@
 ## 资料记录要求
 
 每份重要资料至少记录：来源、作者/机构、发布日期、访问日期、链接、核心结论、与 Predictive Agents 的关系，以及需要复现或验证的部分。
+
+## 竞品调研
+
+`Project_Introductions/` 下保存了社会上已公开的预测类 Agent 竞品调研（2026-09-02 完成），分为五类：
+
+- `commercial_forecasting_platforms.md`：商业预测平台（FutureSearch、Preseen、PolyBridge 等）
+- `tech_trend_platforms.md`：技术趋势预测平台（TrendIntel、Nextatlas、TrendOS 等）——与本项目最接近
+- `academic_forecasting_systems.md`：学术研究系统（AIA Forecaster、ForeDreamer、MCA 等）
+- `opensource_forecasting_tools.md`：开源预测工具（mini-prophet、ForeDreamer 代码等）
+- `traditional_methodologies.md`：传统方法论与基准（Gartner Hype Cycle、Metaculus、Good Judgment 等）
+
+综述笔记：`Notes/competitor_landscape_overview.md`
