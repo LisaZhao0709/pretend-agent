@@ -189,6 +189,94 @@ class PoliteApiClient:
 
         raise RuntimeError("API request exhausted retries without a response")
 
+    def post_json(
+        self,
+        url: str,
+        body: dict[str, Any],
+        *,
+        cache_key: str,
+        extra_headers: dict[str, str] | None = None,
+    ) -> CachedResponse:
+        """POST JSON with a deterministic cache key and bounded retries.
+
+        Args:
+            url: Base URL.
+            body: JSON request body.
+            cache_key: Deterministic suffix appended to the hashed cache name.
+            extra_headers: Optional per-request headers (e.g. X-API-KEY).
+
+        Returns:
+            A ``CachedResponse``. Non-JSON bodies are wrapped as
+            ``{"_non_json_body": text[:500]}``.
+        """
+        cache_path = self.cache_dir / f"{self._cache_name(url, body, cache_key)}.json"
+        if cache_path.exists():
+            with cache_path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            data.setdefault("cache_hit", True)
+            return CachedResponse(**data)
+
+        max_retries = int(self.settings["max_retries"])
+        for attempt in range(max_retries + 1):
+            self._wait_for_spacing()
+            try:
+                headers = {"Content-Type": "application/json"}
+                if extra_headers:
+                    headers = {**headers, **extra_headers}
+                response = self.session.post(
+                    url,
+                    json=body,
+                    headers={**self.session.headers, **headers},
+                    timeout=float(self.settings["timeout_seconds"]),
+                )
+            except requests.RequestException:
+                self._log_attempt(url, None, attempt, "request_exception")
+                if attempt >= max_retries:
+                    raise
+                self._backoff(attempt, retry_after=None)
+                continue
+
+            self._log_attempt(url, response.status_code, attempt, "response")
+            if response.status_code == 429:
+                retry_after = self._retry_after_seconds(response.headers.get("Retry-After"))
+                maximum = float(self.settings.get("max_retry_after_seconds", 60.0))
+                if retry_after is not None and retry_after > maximum:
+                    raise RateLimitedError(
+                        f"Provider requested waiting {retry_after:.1f}s; stopping instead of retrying early",
+                        retry_after_seconds=retry_after,
+                    )
+                if attempt >= max_retries:
+                    response.raise_for_status()
+                self._backoff(attempt, retry_after=response.headers.get("Retry-After"))
+                continue
+
+            if response.status_code >= 500:
+                if attempt >= max_retries:
+                    response.raise_for_status()
+                self._backoff(attempt, retry_after=response.headers.get("Retry-After"))
+                continue
+
+            response.raise_for_status()
+            try:
+                payload = response.json()
+            except (ValueError, json.JSONDecodeError):
+                payload = {"_non_json_body": response.text[:500]}
+            result = CachedResponse(
+                status_code=response.status_code,
+                headers={k: v for k, v in response.headers.items()
+                         if k.lower() in {"date", "etag", "retry-after"}},
+                payload=payload,
+                fetched_at=datetime.now(UTC).isoformat(),
+                url=self._redact_url(response.url),
+                cache_hit=False,
+            )
+            persist = {k: v for k, v in asdict(result).items() if k != "cache_hit"}
+            with cache_path.open("w", encoding="utf-8") as handle:
+                json.dump(persist, handle, ensure_ascii=False, indent=2)
+            return result
+
+        raise RuntimeError("API request exhausted retries without a response")
+
     def _wait_for_spacing(self) -> None:
         minimum = float(self.settings["min_interval_seconds"])
         elapsed = time.monotonic() - self._last_request_at

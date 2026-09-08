@@ -14,11 +14,19 @@ http:
 # Per-source switches and parameters
 sources:
   openalex:
-    enabled: false        # Disabled: group_by=publication_date returns empty + 429 credits paywall
+    enabled: true         # Re-enabled: search + per_page=1 + meta.count works within free $1/day budget
     email: research@example.com   # Override via OPENALEX_EMAIL env var for polite pool
+    # api_key: read from OPENALEX_API_KEY env var (free at openalex.org/settings/api)
   crossref:
     enabled: true
     mailto: research@example.com   # Override via CROSSREF_MAILTO env var for polite pool
+  arxiv:
+    enabled: true
+    # arXiv API is free, no key needed. 3-second min_interval enforced in collector.
+  uspto:
+    enabled: false        # Disabled by default: requires USPTO API key (see .env.example)
+    api_mode: patentsearch  # "odp" (requires USPTO.gov account + ID.me) or "patentsearch"
+    # api_key: read from USPTO_API_KEY env var (free at data.uspto.gov/apis/getting-started)
   gdelt:
     enabled: true
   github:

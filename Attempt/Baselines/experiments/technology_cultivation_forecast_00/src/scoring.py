@@ -142,15 +142,16 @@ def score_snapshot(records: Iterable[dict[str, Any]], scoring_config: dict[str, 
         raise ValueError("Scoring weights must sum to a positive value")
 
     for item in combined.values():
-        # Prefer crossref_score (enabled replacement); fall back to openalex_score
-        academic = 0.0
-        has_academic = False
-        if "crossref_score" in item:
-            academic = max(float(item["crossref_score"]), 0.0)
-            has_academic = True
-        elif "openalex_score" in item:
-            academic = max(float(item["openalex_score"]), 0.0)
-            has_academic = True
+        # Academic dimension: aggregate crossref, openalex, arxiv, and uspto scores.
+        # Use the average of all available academic sources for robustness;
+        # if only one is available, use that one.
+        academic_scores: list[float] = []
+        for src in ("crossref", "openalex", "arxiv", "uspto"):
+            key = f"{src}_score"
+            if key in item:
+                academic_scores.append(max(float(item[key]), 0.0))
+        academic = sum(academic_scores) / len(academic_scores) if academic_scores else 0.0
+        has_academic = len(academic_scores) > 0
         corporate = max(float(item.get("gdelt_score", 0.0)), 0.0)
         has_corporate = "gdelt_score" in item
         community = max(float(item.get("github_score", 0.0)), 0.0)
@@ -203,6 +204,17 @@ def evaluate_ranking(predictions: list[dict[str, Any]], future_records: Iterable
             other_future.append(rec)
     github_monthly_future = _aggregate_github_to_monthly(github_daily_future)
     all_future = other_future + github_monthly_future
+
+    # For academic sources (crossref, openalex, arxiv, uspto), merge into a single
+    # "academic" pseudo-source so the evaluation averages them together.
+    academic_records: list[dict[str, Any]] = []
+    non_academic_future: list[dict[str, Any]] = []
+    for rec in all_future:
+        if rec.get("source") in ("crossref", "openalex", "arxiv", "uspto"):
+            academic_records.append({**rec, "source": "academic"})
+        else:
+            non_academic_future.append(rec)
+    all_future = non_academic_future + academic_records
 
     source_topic_activity: dict[tuple[str, str], float] = {}
     for record in all_future:

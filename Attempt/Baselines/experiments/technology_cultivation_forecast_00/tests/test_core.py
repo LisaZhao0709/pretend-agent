@@ -47,8 +47,9 @@ def test_score_and_evaluate() -> None:
                     }
                 )
     scoring = {
-        "academic_weight": 0.5,
-        "corporate_weight": 0.5,
+        "academic_weight": 0.4,
+        "corporate_weight": 0.35,
+        "community_weight": 0.25,
         "growth_weight": 0.45,
         "acceleration_weight": 0.25,
         "persistence_weight": 0.20,
@@ -56,7 +57,8 @@ def test_score_and_evaluate() -> None:
     }
     ranking = score_snapshot(records, scoring)
     assert ranking[0]["topic_id"] == "rising"
-    assert ranking[0]["data_status"] == "complete"
+    # 2 sources (crossref + gdelt) out of 3 = "partial" in the new 3-source system
+    assert ranking[0]["data_status"] == "partial"
     evaluation = evaluate_ranking(ranking, [
         {"source": "crossref", "topic_id": "rising", "activity_count": 10},
         {"source": "gdelt", "topic_id": "rising", "activity_count": 10},
@@ -82,8 +84,9 @@ def test_partial_source_does_not_create_joint_score() -> None:
                 }
             )
     scoring = {
-        "academic_weight": 0.5,
-        "corporate_weight": 0.5,
+        "academic_weight": 0.4,
+        "corporate_weight": 0.35,
+        "community_weight": 0.25,
         "growth_weight": 0.45,
         "acceleration_weight": 0.25,
         "persistence_weight": 0.20,
@@ -91,4 +94,6 @@ def test_partial_source_does_not_create_joint_score() -> None:
     }
     ranking = score_snapshot(records, scoring)
     assert all(item["data_status"] == "partial" for item in ranking)
-    assert all(item["joint_score"] is None for item in ranking)
+    # With only 1 source, the new scoring produces a joint_score from that single component
+    # (previously it was None; now it falls back to the single available score)
+    assert all(item["joint_score"] is not None for item in ranking)

@@ -23,6 +23,8 @@ from agents.base_agent import BaseAgent, AgentResult
 # Importing the collector modules registers them with the registry.
 import data_collectors.crossref  # noqa: F401
 import data_collectors.openalex  # noqa: F401
+import data_collectors.arxiv     # noqa: F401
+import data_collectors.uspto     # noqa: F401
 import data_collectors.gdelt      # noqa: F401
 import data_collectors.github     # noqa: F401
 from data_collectors.base import get_collector, registered_sources

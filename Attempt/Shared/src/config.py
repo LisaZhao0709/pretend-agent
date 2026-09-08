@@ -24,6 +24,8 @@ class TopicConfig:
     gdelt_query: str
     crossref_query: str = ""
     github_query: str = ""
+    arxiv_query: str = ""
+    uspto_query: str = ""
 
 
 @dataclass
@@ -75,6 +77,8 @@ def load_topics(topics_path: Path) -> list[TopicConfig]:
             gdelt_query=item["gdelt_query"],
             crossref_query=item.get("crossref_query", item["openalex_query"]),
             github_query=item.get("github_query", ""),
+            arxiv_query=item.get("arxiv_query", item["openalex_query"]),
+            uspto_query=item.get("uspto_query", item["openalex_query"]),
         ))
     return topics
 
@@ -154,6 +158,8 @@ def ensure_dirs(cfg: PipelineConfig) -> None:
     for path in [
         cfg.raw_api_path / "openalex",
         cfg.raw_api_path / "crossref",
+        cfg.raw_api_path / "arxiv",
+        cfg.raw_api_path / "uspto",
         cfg.raw_api_path / "gdelt",
         cfg.raw_api_path / "github",
         cfg.interim_path,
