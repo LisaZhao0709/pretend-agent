@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "运行预测流水线 (Run Pipeline)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/Attempt/run_pipeline.py",
+            "cwd": "${workspaceFolder}/Attempt",
+            "console": "integratedTerminal"
+        }
+    ]
+}

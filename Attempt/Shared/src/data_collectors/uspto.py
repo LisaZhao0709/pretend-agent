@@ -28,6 +28,7 @@ the PatentSearch API is recommended for projects without USPTO.gov accounts.
 from __future__ import annotations
 
 import os
+import asyncio
 from typing import Any
 
 from config import PipelineConfig, generate_monthly_windows, month_range
@@ -82,7 +83,7 @@ class UsptoCollector:
 
     source_name = "uspto"
 
-    def collect(
+    async def collect(
         self,
         cfg: PipelineConfig,
         http_settings: dict[str, Any],
@@ -115,6 +116,8 @@ class UsptoCollector:
         )
         client = PoliteApiClient(cache_dir, uspto_settings)
 
+        await client.__aenter__()
+
         records: list[dict[str, Any]] = []
 
         for topic in cfg.topics:
@@ -127,7 +130,7 @@ class UsptoCollector:
                     if api_mode == "odp":
                         params = _build_odp_params(query, date_start, date_end)
                         headers = {"X-API-KEY": api_key}
-                        response = client.get_json(
+                        response = await client.get_json(
                             base_url,
                             params,
                             cache_key=cache_key,
@@ -136,7 +139,7 @@ class UsptoCollector:
                     else:
                         body = _build_patentsearch_body(query, date_start, date_end)
                         headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
-                        response = client.post_json(
+                        response = await client.post_json(
                             base_url,
                             body,
                             cache_key=cache_key,
@@ -166,6 +169,7 @@ class UsptoCollector:
                     "cached": response.cache_hit,
                 })
 
+        await client.__aexit__(None, None, None)
         return records
 
     def _get_topic_query(self, topic: Any) -> str:

@@ -17,6 +17,7 @@ Key robustness fixes vs. the old client:
 from __future__ import annotations
 
 from datetime import datetime
+import asyncio
 from typing import Any
 
 from config import PipelineConfig, generate_monthly_windows
@@ -120,7 +121,7 @@ def _build_params(query: str, date_start: str, date_end: str) -> dict[str, Any]:
 class GdeltCollector:
     """Monthly news-activity collector for GDELT DOC 2.0 timeline API."""
 
-    def collect(
+    async def collect(
         self,
         cfg: PipelineConfig,
         http_settings: dict[str, Any],
@@ -132,6 +133,8 @@ class GdeltCollector:
 
         cache_dir = cfg.raw_api_path / "gdelt"
         client = PoliteApiClient(cache_dir, http_settings)
+
+        await client.__aenter__()
         overall_start = windows[0][0]
         overall_end = windows[-1][1]
         records: list[dict[str, Any]] = []
@@ -141,7 +144,7 @@ class GdeltCollector:
             params = _build_params(query, overall_start, overall_end)
             cache_key = f"gdelt_{topic.topic_id}_{overall_start}_{overall_end}"
             try:
-                response = client.get_json(GDELT_BASE_URL, params, cache_key=cache_key)
+                response = await client.get_json(GDELT_BASE_URL, params, cache_key=cache_key)
             except Exception as exc:  # noqa: BLE001 - preserve partial progress
                 records.extend(self._failed_records(topic, windows, exc))
                 continue
@@ -166,6 +169,7 @@ class GdeltCollector:
                     "cached": response.cache_hit,
                 })
 
+        await client.__aexit__(None, None, None)
         return records
 
     @staticmethod

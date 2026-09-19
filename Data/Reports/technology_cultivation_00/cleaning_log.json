@@ -1,0 +1,29 @@
+{
+  "input_count": 150,
+  "ok_count": 150,
+  "failed_count": 0,
+  "failed_by_source": {},
+  "sources": {
+    "openalex": 0,
+    "crossref": 0,
+    "arxiv": 0,
+    "uspto": 0,
+    "gdelt": 150,
+    "github": 0
+  },
+  "anomalies_detected": 846,
+  "rows_dropped": {
+    "zscore": 0,
+    "iqr": 0,
+    "likely_api_failure": 90,
+    "sudden_drop": 0,
+    "total_dropped": 90
+  },
+  "windows_filled": {
+    "filled": 0,
+    "by_strategy": {
+      "forward_fill": 0
+    }
+  },
+  "final_pivot_rows": 60
+}

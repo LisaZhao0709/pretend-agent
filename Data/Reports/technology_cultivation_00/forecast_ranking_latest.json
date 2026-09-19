@@ -1,0 +1,40 @@
+[
+  {
+    "topic_id": "quantum_comp",
+    "topic_label": "Quantum Computing",
+    "gdelt_score": 0.55,
+    "gdelt_features": {
+      "source": "gdelt",
+      "topic_id": "quantum_comp",
+      "topic_label": "Quantum Computing",
+      "window_start": "2025-06",
+      "window_end": "2025-07",
+      "latest_activity": 782.0,
+      "growth": -0.7121230820189517,
+      "acceleration": -0.810822457309996,
+      "persistence": 1.0,
+      "source_score": 0.55
+    },
+    "data_status": "partial",
+    "joint_score": 0.55
+  },
+  {
+    "topic_id": "llm",
+    "topic_label": "Large Language Models",
+    "gdelt_score": 0.44999999999999996,
+    "gdelt_features": {
+      "source": "gdelt",
+      "topic_id": "llm",
+      "topic_label": "Large Language Models",
+      "window_start": "2025-06",
+      "window_end": "2025-07",
+      "latest_activity": 5569.0,
+      "growth": -0.7413387215447855,
+      "acceleration": -0.7854095006293669,
+      "persistence": 1.0,
+      "source_score": 0.44999999999999996
+    },
+    "data_status": "partial",
+    "joint_score": 0.44999999999999996
+  }
+]

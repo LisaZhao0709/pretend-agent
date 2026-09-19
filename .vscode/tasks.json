@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run Predictive Pipeline",
+            "type": "shell",
+            "command": "C:\\Users\\Xiaol\\AppData\\Local\\Programs\\Python\\Python311\\python.exe -u run_pipeline.py",
+            "options": {
+                "cwd": "${workspaceFolder}/Attempt"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

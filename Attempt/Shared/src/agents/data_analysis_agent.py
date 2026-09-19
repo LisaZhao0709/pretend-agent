@@ -23,6 +23,7 @@ import json
 import time
 from pathlib import Path
 from typing import Any
+import pandas as pd
 
 from config import PipelineConfig, generate_monthly_windows
 from processors.normalize import (
@@ -83,7 +84,7 @@ class DataAnalysisAgent(BaseAgent):
         """
         # Group signals by (topic_id, month)
         gh_by_topic_month: dict[tuple[str, str], list[dict[str, Any]]] = {}
-        for sig in gh_signals.values():
+        for sig in gh_signals:
             tid = sig.get("topic_id", "unknown")
             date_str = sig.get("created_at", "")
             if date_str:
@@ -140,7 +141,7 @@ class DataAnalysisAgent(BaseAgent):
                 "github": len(github_recs),
             }
 
-            # Step 3: Merge and pivot
+            # Step 3: Merge and pivot (returns DataFrame)
             merged = merge_records_by_source(
                 [r for r in clean_recs if r.get("source") == "openalex"],
                 [r for r in clean_recs if r.get("source") == "gdelt"],
@@ -149,16 +150,18 @@ class DataAnalysisAgent(BaseAgent):
                 [r for r in clean_recs if r.get("source") == "arxiv"],
                 [r for r in clean_recs if r.get("source") == "uspto"],
             )
-            pivot = create_pivot_table(merged)
+            pivot_df = create_pivot_table(merged)
 
-            # Step 4: Detect anomalies (tag, don't remove yet)
-            pivot = tag_anomalies_in_pivot(pivot)
-            anomaly_summary = summarize_anomalies(pivot)
+            # Step 4: Detect anomalies (tag, don't remove yet) - expects list of dicts
+            pivot_records = pivot_df.to_dict("records")
+            pivot_records = tag_anomalies_in_pivot(pivot_records)
+            anomaly_summary = summarize_anomalies(pivot_records)
             cleaning_log["anomalies_detected"] = anomaly_summary["total_anomalies"]
 
-            # Step 5: Filter anomalous rows (drop only likely API failures where ALL sources fail)
-            pivot, drop_counts = filter_anomalous_pivot_rows(
-                pivot,
+            # Step 5: Filter anomalous rows (expects DataFrame now)
+            pivot_df = pd.DataFrame(pivot_records)
+            pivot_df, drop_counts = filter_anomalous_pivot_rows(
+                pivot_df,
                 drop_likely_api_failure=True,
                 drop_zscore=False,
                 drop_iqr=False,
@@ -168,16 +171,18 @@ class DataAnalysisAgent(BaseAgent):
 
             # Step 6: Fill missing windows
             all_windows = [w[0] for w in generate_monthly_windows(self.cfg.start_date, self.cfg.end_date)]
-            pivot, fill_counts = fill_missing_windows(
-                pivot, all_windows, strategy="forward_fill",
+            pivot_df, fill_counts = fill_missing_windows(
+                pivot_df, all_windows, strategy="forward_fill",
             )
             cleaning_log["windows_filled"] = fill_counts
 
             # Step 7: Standardize cross-source (robust scaling)
-            pivot = standardize_pivot(pivot, method="robust")
+            pivot_df = standardize_pivot(pivot_df, method="robust")
 
             # Step 8: Smooth signal (moving median, window=3)
-            pivot = smooth_signal(pivot, window_size=3, method="median")
+            pivot_df = smooth_signal(pivot_df, window_size=3, method="median")
+            
+            pivot = pivot_df.to_dict("records")
 
             # Step 9: Extend with GitHub repo-level signals
             gh_signals = self._load_github_signals()

@@ -1,20 +1,6 @@
-"""Data cleaning rules for collected activity records.
-
-Cleans both raw records (before pivot) and pivot rows (after pivot):
-- Filter out failed collections (collection_status != "ok")
-- Filter out records with None activity_count
-- Mark and optionally remove consecutive-zero runs (likely API failures)
-- Fill missing windows with configurable strategy (zero_fill, forward_fill, interpolate)
-- Smooth signal with optional moving median (more robust than moving average)
-
-All cleaning steps are configurable and produce a cleaning log so the
-transformation from raw to clean data is fully traceable.
-"""
-
-from __future__ import annotations
-
 import json
 import math
+import pandas as pd
 from pathlib import Path
 from typing import Any
 
@@ -22,14 +8,6 @@ from typing import Any
 def filter_failed_records(
     records: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Split records into (ok, failed) based on collection_status.
-
-    Args:
-        records: Raw activity records from collectors.
-
-    Returns:
-        Tuple of (ok_records, failed_records).
-    """
     ok: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
     for rec in records:
@@ -41,34 +19,15 @@ def filter_failed_records(
 
 
 def filter_anomalous_pivot_rows(
-    pivot: list[dict[str, Any]],
+    pivot: pd.DataFrame,
     source_columns: list[str] | None = None,
     drop_zscore: bool = False,
     drop_iqr: bool = False,
     drop_likely_api_failure: bool = True,
     drop_sudden_drop: bool = False,
-) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """Filter pivot rows based on anomaly tags from detector.tag_anomalies_in_pivot.
-
-    A row is dropped only if ALL source columns have the specified anomaly type.
-    This avoids dropping an entire month just because one source had an outlier.
-
-    Args:
-        pivot: Pivot table with anomaly tags.
-        source_columns: Columns to check (default: all *_count columns).
-        drop_zscore: Drop rows where all sources have zscore outlier.
-        drop_iqr: Drop rows where all sources have iqr outlier.
-        drop_likely_api_failure: Drop rows where all sources tagged likely_api_failure.
-        drop_sudden_drop: Drop rows where all sources tagged sudden_drop.
-
-    Returns:
-        Tuple of (cleaned_pivot, drop_counts).
-    """
+) -> tuple[pd.DataFrame, dict[str, int]]:
     if source_columns is None:
-        source_columns = [
-            c for c in (pivot[0].keys() if pivot else [])
-            if c.endswith("_count")
-        ]
+        source_columns = [c for c in pivot.columns if c.endswith("_count")]
 
     drop_counts = {
         "zscore": 0,
@@ -77,209 +36,129 @@ def filter_anomalous_pivot_rows(
         "sudden_drop": 0,
         "total_dropped": 0,
     }
+    
+    active_source_columns = [c for c in source_columns if c in pivot.columns and pivot[c].sum() > 0]
+    if not active_source_columns:
+        return pivot, drop_counts
 
-    cleaned: list[dict[str, Any]] = []
-    for row in pivot:
-        drop = False
-        if drop_zscore and all(row.get(f"{c}_zscore_outlier", False) for c in source_columns):
-            drop = True
-            drop_counts["zscore"] += 1
-        if drop_iqr and all(row.get(f"{c}_iqr_outlier", False) for c in source_columns):
-            drop = True
-            drop_counts["iqr"] += 1
-        if drop_likely_api_failure and all(
-            row.get(f"{c}_zero_tag", "") == "likely_api_failure" for c in source_columns
-        ):
-            drop = True
-            drop_counts["likely_api_failure"] += 1
-        if drop_sudden_drop and all(
-            row.get(f"{c}_zero_tag", "") == "sudden_drop" for c in source_columns
-        ):
-            drop = True
-            drop_counts["sudden_drop"] += 1
+    drop_mask = pd.Series(False, index=pivot.index)
 
-        if drop:
-            drop_counts["total_dropped"] += 1
-        else:
-            cleaned.append(row)
+    if drop_zscore:
+        cols = [f"{c}_zscore_outlier" for c in active_source_columns if f"{c}_zscore_outlier" in pivot.columns]
+        if cols:
+            mask = pivot[cols].any(axis=1)
+            drop_counts["zscore"] = mask.sum()
+            drop_mask |= mask
+
+    if drop_iqr:
+        cols = [f"{c}_iqr_outlier" for c in active_source_columns if f"{c}_iqr_outlier" in pivot.columns]
+        if cols:
+            mask = pivot[cols].any(axis=1)
+            drop_counts["iqr"] = mask.sum()
+            drop_mask |= mask
+
+    if drop_likely_api_failure:
+        cols = [f"{c}_zero_tag" for c in active_source_columns if f"{c}_zero_tag" in pivot.columns]
+        if cols:
+            mask = (pivot[cols] == "likely_api_failure").all(axis=1)
+            drop_counts["likely_api_failure"] = mask.sum()
+            drop_mask |= mask
+
+    if drop_sudden_drop:
+        cols = [f"{c}_zero_tag" for c in active_source_columns if f"{c}_zero_tag" in pivot.columns]
+        if cols:
+            mask = (pivot[cols] == "sudden_drop").all(axis=1)
+            drop_counts["sudden_drop"] = mask.sum()
+            drop_mask |= mask
+
+    drop_counts["total_dropped"] = drop_mask.sum()
+    cleaned = pivot[~drop_mask].copy()
 
     return cleaned, drop_counts
 
 
 def fill_missing_windows(
-    pivot: list[dict[str, Any]],
+    pivot: pd.DataFrame,
     all_windows: list[str],
     source_columns: list[str] | None = None,
     strategy: str = "zero_fill",
-) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """Fill missing time windows for each topic with a configurable strategy.
-
-    Args:
-        pivot: Pivot table (sorted by topic_id, window_start).
-        all_windows: Complete list of expected window_start values (YYYY-MM).
-        source_columns: Count columns to fill (default: all *_count).
-        strategy: One of "zero_fill", "forward_fill", "interpolate".
-
-    Returns:
-        Tuple of (filled_pivot, fill_counts).
-    """
+) -> tuple[pd.DataFrame, dict[str, int]]:
     if source_columns is None:
-        source_columns = [
-            c for c in (pivot[0].keys() if pivot else [])
-            if c.endswith("_count")
-        ]
+        source_columns = [c for c in pivot.columns if c.endswith("_count")]
 
-    if not all_windows:
-        return pivot, {"filled": 0}
+    if not all_windows or pivot.empty:
+        return pivot, {"filled": 0, "by_strategy": {strategy: 0}}
 
-    # Group existing rows by topic_id
-    by_topic: dict[str, dict[str, dict[str, Any]]] = {}
-    topic_labels: dict[str, str] = {}
-    for row in pivot:
-        tid = row.get("topic_id", "unknown")
-        ws = row.get("window_start", "")
-        by_topic.setdefault(tid, {})[ws] = row
-        topic_labels[tid] = row.get("topic_label", tid)
+    topic_ids = pivot["topic_id"].unique()
+    
+    # Create complete multi-index of all (topic_id, window_start)
+    multi_idx = pd.MultiIndex.from_product(
+        [topic_ids, all_windows], names=["topic_id", "window_start"]
+    )
+    
+    # Set index to match and reindex
+    pivot_indexed = pivot.set_index(["topic_id", "window_start"])
+    filled_count = len(multi_idx) - len(pivot_indexed)
+    
+    # Identify the topic_label mapping
+    topic_labels = pivot[["topic_id", "topic_label"]].drop_duplicates().set_index("topic_id")["topic_label"]
+    
+    pivot_reindexed = pivot_indexed.reindex(multi_idx)
+    
+    # Restore topic_label
+    pivot_reindexed["topic_label"] = pivot_reindexed.index.get_level_values("topic_id").map(topic_labels)
+    pivot_reindexed["_filled"] = pivot_reindexed[source_columns[0]].isna()
+    
+    # Groupby topic_id to fill values
+    for col in source_columns:
+        if strategy == "zero_fill":
+            pivot_reindexed[col] = pivot_reindexed[col].fillna(0)
+        elif strategy == "forward_fill":
+            pivot_reindexed[col] = pivot_reindexed.groupby("topic_id")[col].ffill().fillna(0)
+        else:
+            pivot_reindexed[col] = pivot_reindexed[col].fillna(0)
+            
+    # For any remaining columns, just forward fill
+    other_cols = [c for c in pivot_reindexed.columns if c not in source_columns and c not in ["topic_label", "_filled"]]
+    for col in other_cols:
+        pivot_reindexed[col] = pivot_reindexed.groupby("topic_id")[col].ffill()
 
-    fill_counts = {"filled": 0, "by_strategy": {strategy: 0}}
-
-    result: list[dict[str, Any]] = []
-    for tid in sorted(by_topic.keys()):
-        topic_label = topic_labels.get(tid, tid)
-        prev_values: dict[str, float] = {}
-        for ws in all_windows:
-            existing = by_topic.get(tid, {}).get(ws)
-            if existing is not None:
-                # Update prev_values for interpolation/forward_fill
-                for col in source_columns:
-                    prev_values[col] = float(existing.get(col, 0))
-                result.append(existing)
-            else:
-                # Create a filled row
-                new_row: dict[str, Any] = {
-                    "topic_id": tid,
-                    "topic_label": topic_label,
-                    "window_start": ws,
-                    "_filled": True,
-                }
-                for col in source_columns:
-                    if strategy == "zero_fill":
-                        new_row[col] = 0
-                    elif strategy == "forward_fill":
-                        new_row[col] = prev_values.get(col, 0)
-                    elif strategy == "interpolate":
-                        # Simple linear interpolation: use prev value (no future lookahead)
-                        new_row[col] = prev_values.get(col, 0)
-                    else:
-                        new_row[col] = 0
-                # Copy non-count columns from the nearest existing row if available
-                nearest = next(
-                    (by_topic[tid][w] for w in all_windows if w in by_topic.get(tid, {})),
-                    None,
-                )
-                if nearest:
-                    for key, val in nearest.items():
-                        if key not in new_row and not key.endswith("_count"):
-                            new_row[key] = val
-                result.append(new_row)
-                fill_counts["filled"] += 1
-                fill_counts["by_strategy"][strategy] = fill_counts["by_strategy"].get(strategy, 0) + 1
-
-    result.sort(key=lambda r: (r["topic_id"], r["window_start"]))
+    result = pivot_reindexed.reset_index()
+    
+    fill_counts = {"filled": filled_count, "by_strategy": {strategy: filled_count}}
     return result, fill_counts
 
 
 def smooth_signal(
-    pivot: list[dict[str, Any]],
+    pivot: pd.DataFrame,
     source_columns: list[str] | None = None,
     window_size: int = 3,
     method: str = "median",
-) -> list[dict[str, Any]]:
-    """Apply moving median or moving average smoothing to source columns.
-
-    Adds ``{col}_smoothed`` columns alongside the original ``{col}`` columns.
-    The original values are preserved; smoothing is additive.
-
-    Args:
-        pivot: Pivot table (sorted by topic_id, window_start).
-        source_columns: Columns to smooth (default: all *_count).
-        window_size: Rolling window size (default 3).
-        method: "median" or "mean".
-
-    Returns:
-        Pivot with added ``{col}_smoothed`` columns.
-    """
+) -> pd.DataFrame:
     if source_columns is None:
-        source_columns = [
-            c for c in (pivot[0].keys() if pivot else [])
-            if c.endswith("_count")
-        ]
+        source_columns = [c for c in pivot.columns if c.endswith("_count")]
 
-    by_topic: dict[str, list[dict[str, Any]]] = {}
-    for row in pivot:
-        tid = row.get("topic_id", "unknown")
-        by_topic.setdefault(tid, []).append(row)
+    if pivot.empty:
+        return pivot
 
-    for tid, rows in by_topic.items():
-        for col in source_columns:
-            values = [float(row.get(col, 0)) for row in rows]
-            smoothed = _rolling_smooth(values, window_size, method)
-            for i, row in enumerate(rows):
-                row[f"{col}_smoothed"] = round(smoothed[i], 2)
+    pivot = pivot.sort_values(["topic_id", "window_start"])
+
+    for col in source_columns:
+        if method == "median":
+            smoothed = pivot.groupby("topic_id")[col].rolling(window=window_size, center=False, min_periods=1).median()
+        else:
+            smoothed = pivot.groupby("topic_id")[col].rolling(window=window_size, center=False, min_periods=1).mean()
+        
+        # rolling returns multi-index (topic_id, original_index)
+        # we can align back to the original dataframe
+        pivot[f"{col}_smoothed"] = smoothed.reset_index(level=0, drop=True).round(2)
 
     return pivot
-
-
-def _rolling_smooth(
-    values: list[float],
-    window_size: int,
-    method: str,
-) -> list[float]:
-    """Apply rolling smoothing to a list of values.
-
-    Args:
-        values: Input time series.
-        window_size: Rolling window size.
-        method: "median" or "mean".
-
-    Returns:
-        Smoothed series of the same length.
-    """
-    n = len(values)
-    if n == 0:
-        return []
-    half = window_size // 2
-    result: list[float] = []
-    for i in range(n):
-        start = max(0, i - half)
-        end = min(n, i + half + 1)
-        window = values[start:end]
-        if method == "median":
-            window_sorted = sorted(window)
-            mid = len(window_sorted) // 2
-            if len(window_sorted) % 2 == 0:
-                result.append((window_sorted[mid - 1] + window_sorted[mid]) / 2)
-            else:
-                result.append(window_sorted[mid])
-        else:
-            result.append(sum(window) / len(window) if window else 0.0)
-    return result
 
 
 def clean_records(
     records: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Full cleaning pipeline for raw activity records (before pivot).
-
-    Steps:
-    1. Filter out failed collections and None activity_count.
-
-    Args:
-        records: Raw activity records from collectors.
-
-    Returns:
-        Tuple of (clean_records, cleaning_log).
-    """
     ok, failed = filter_failed_records(records)
     log = {
         "input_count": len(records),
@@ -294,7 +173,7 @@ def clean_records(
 
 
 def save_cleaning_log(log: dict[str, Any], path: Path) -> None:
-    """Save cleaning log to JSON."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    from processors.json_utils import NumpyEncoder
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(log, f, ensure_ascii=False, indent=2)
+        json.dump(log, f, ensure_ascii=False, indent=2, cls=NumpyEncoder)

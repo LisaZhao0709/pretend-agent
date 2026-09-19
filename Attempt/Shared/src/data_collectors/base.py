@@ -25,6 +25,7 @@ and returns a list of activity records. Each record MUST carry:
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 
@@ -36,68 +37,36 @@ from http_client import PoliteApiClient, CachedResponse
 class SourceCollector(Protocol):
     """Unified interface for every data source collector."""
 
+_COLLECTORS: dict[str, type[SourceCollector]] = {}
+
+def register(name: str):
+    def decorator(cls: type[SourceCollector]) -> type[SourceCollector]:
+        _COLLECTORS[name] = cls
+        return cls
+    return decorator
+
+def get_collector_class(name: str) -> type[SourceCollector]:
+    if name not in _COLLECTORS:
+        raise ValueError(f"Unknown collector: {name}")
+    return _COLLECTORS[name]
+
     source_name: str
 
-    def collect(
+    async def collect(
         self,
         cfg: PipelineConfig,
         http_settings: dict[str, Any],
         source_cfg: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        """Collect activity records for all enabled topics and windows.
-
-        Returns a flat list of records (see module docstring for the schema).
-        Per-window failures are returned as ``collection_status == "failed"``
-        records rather than raised, so partial progress is preserved.
-        """
         ...
 
-
-_REGISTRY: dict[str, SourceCollector] = {}
-
-
-def register(source_name: str) -> Any:
-    """Class decorator: register a collector under ``source_name``."""
-
-    def decorator(cls: Any) -> Any:
-        cls.source_name = source_name
-        _REGISTRY[source_name] = cls()
-        return cls
-
-    return decorator
-
-
-def get_collector(source_name: str) -> SourceCollector:
-    """Look up a registered collector by source name."""
-    try:
-        return _REGISTRY[source_name]
-    except KeyError as exc:
-        raise ValueError(f"Unknown source: {source_name!r}. Registered: {sorted(_REGISTRY)}") from exc
-
-
-def registered_sources() -> list[str]:
-    """Return the sorted list of registered source names."""
-    return sorted(_REGISTRY)
-
-
 class MonthCountCollector:
-    """Base for sources that fetch one count per (topic, month) window.
+    """Base class for sources that query API for count per month window."""
 
-    Implements the full ``collect()`` loop: iterate topics x months, build
-    params, call :class:`~http_client.PoliteApiClient`, handle failures, and
-    emit records. Subclasses only override the 4 hooks that differ per source:
+    source_name: str
+    base_url: str
 
-    - :attr:`base_url`: API endpoint
-    - :meth:`build_params`: how to assemble query parameters
-    - :meth:`parse_count`: how to read the count from the response
-    - :meth:`resolve_contact`: how to get the polite-pool email (if any)
-
-    ``source_name`` is set by the ``@register`` decorator at import time.
-    """
-
-    base_url: str = ""
-
-    def collect(
+    async def collect(
         self,
         cfg: PipelineConfig,
         http_settings: dict[str, Any],
@@ -108,42 +77,47 @@ class MonthCountCollector:
             return []
 
         cache_dir = cfg.raw_api_path / self.source_name
-        client = PoliteApiClient(cache_dir, http_settings)
         contact = self.resolve_contact(source_cfg)
         records: list[dict[str, Any]] = []
 
-        for topic in cfg.topics:
-            query = self.get_topic_query(topic)
-            for w_start, w_end in windows:
-                date_start, date_end = month_range(w_start)
-                params = self.build_params(query, date_start, date_end, contact)
-                cache_key = f"{self.source_name}_{topic.topic_id}_{w_start}_{w_end}"
-                try:
-                    response = client.get_json(self.base_url, params, cache_key=cache_key)
-                except Exception as exc:  # noqa: BLE001 - preserve partial progress
-                    records.append(self._failed_record(topic, w_start, w_end, exc))
-                    continue
-
-                if isinstance(response.payload, dict) and "_non_json_body" in response.payload:
-                    records.append(self._failed_record(
-                        topic, w_start, w_end,
-                        RuntimeError(f"non-JSON response: {response.payload['_non_json_body'][:120]}"),
-                    ))
-                    continue
-
-                records.append({
-                    "source": self.source_name,
-                    "topic_id": topic.topic_id,
-                    "topic_label": topic.topic_label,
-                    "window_start": w_start,
-                    "window_end": w_end,
-                    "activity_count": self.parse_count(response),
-                    "collection_status": "ok",
-                    "collected_at": response.fetched_at,
-                    "cached": response.cache_hit,
-                })
+        async with PoliteApiClient(cache_dir, http_settings) as client:
+            tasks = []
+            for topic in cfg.topics:
+                query = self.get_topic_query(topic)
+                for w_start, w_end in windows:
+                    date_start, date_end = month_range(w_start)
+                    params = self.build_params(query, date_start, date_end, contact)
+                    cache_key = f"{self.source_name}_{topic.topic_id}_{w_start}_{w_end}"
+                    tasks.append(self._fetch_single(client, topic, w_start, w_end, params, cache_key))
+            
+            results = await asyncio.gather(*tasks)
+            records.extend(results)
 
         return records
+
+    async def _fetch_single(self, client: PoliteApiClient, topic: Any, w_start: str, w_end: str, params: dict[str, Any], cache_key: str) -> dict[str, Any]:
+        try:
+            response = await client.get_json(self.base_url, params, cache_key=cache_key)
+        except Exception as exc:
+            return self._failed_record(topic, w_start, w_end, exc)
+
+        if isinstance(response.payload, dict) and "_non_json_body" in response.payload:
+            return self._failed_record(
+                topic, w_start, w_end,
+                RuntimeError(f"non-JSON response: {response.payload['_non_json_body'][:120]}"),
+            )
+
+        return {
+            "source": self.source_name,
+            "topic_id": topic.topic_id,
+            "topic_label": topic.topic_label,
+            "window_start": w_start,
+            "window_end": w_end,
+            "activity_count": self.parse_count(response),
+            "collection_status": "ok",
+            "collected_at": response.fetched_at,
+            "cached": response.cache_hit,
+        }
 
     # --- Hooks: subclasses override these 4 ---
 

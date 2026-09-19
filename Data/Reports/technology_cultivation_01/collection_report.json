@@ -1,0 +1,97 @@
+{
+  "dataset": "technology_cultivation_01",
+  "started_at": "2026-09-19 16:14:53",
+  "registered_sources": [
+    "crossref",
+    "arxiv",
+    "uspto",
+    "gdelt",
+    "github"
+  ],
+  "by_topic": [
+    {
+      "topic_id": "large_language_models",
+      "topic_label": "Large Language Models",
+      "sources": {
+        "crossref": {
+          "ok": 30,
+          "failed": 0
+        }
+      }
+    },
+    {
+      "topic_id": "ai_agents",
+      "topic_label": "AI Agents",
+      "sources": {
+        "crossref": {
+          "ok": 30,
+          "failed": 0
+        }
+      }
+    },
+    {
+      "topic_id": "embodied_intelligence",
+      "topic_label": "Embodied Intelligence",
+      "sources": {
+        "crossref": {
+          "ok": 30,
+          "failed": 0
+        }
+      }
+    },
+    {
+      "topic_id": "robotics",
+      "topic_label": "Robotics",
+      "sources": {
+        "crossref": {
+          "ok": 30,
+          "failed": 0
+        }
+      }
+    },
+    {
+      "topic_id": "quantum_computing",
+      "topic_label": "Quantum Computing",
+      "sources": {
+        "crossref": {
+          "ok": 30,
+          "failed": 0
+        }
+      }
+    },
+    {
+      "topic_id": "metaverse",
+      "topic_label": "Metaverse",
+      "sources": {
+        "crossref": {
+          "ok": 30,
+          "failed": 0
+        }
+      }
+    }
+  ],
+  "by_source": {
+    "openalex": {
+      "enabled": false
+    },
+    "crossref": {
+      "enabled": true,
+      "records": 180,
+      "ok": 180,
+      "failed": 0
+    },
+    "arxiv": {
+      "enabled": false
+    },
+    "uspto": {
+      "enabled": false
+    },
+    "gdelt": {
+      "enabled": false
+    },
+    "github": {
+      "enabled": false
+    }
+  },
+  "finished_at": "2026-09-19 16:14:53"
+}

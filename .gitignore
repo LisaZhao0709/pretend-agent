@@ -37,8 +37,10 @@ Attempt/**/run_logs/
 *.parquet
 Data/Cache/*
 !Data/Cache/.gitkeep
-Data/Raw/APIs/technology_cultivation_00/*
-Data/Interim/technology_cultivation_00/*
+Data/Raw/APIs/*
+!Data/Raw/APIs/.gitkeep
+Data/Interim/*
+!Data/Interim/.gitkeep
 
 # Notebook-generated state
 .ipynb_checkpoints/

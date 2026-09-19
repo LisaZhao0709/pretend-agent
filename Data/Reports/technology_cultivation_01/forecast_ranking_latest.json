@@ -1,0 +1,178 @@
+[
+  {
+    "topic_id": "robotics",
+    "topic_label": "Robotics",
+    "crossref_score": 0.5135380358005824,
+    "crossref_features": {
+      "source": "crossref",
+      "topic_id": "robotics",
+      "topic_label": "Robotics",
+      "window_start": "2025-06",
+      "window_end": "2025-07",
+      "latest_activity": 3362.0,
+      "latest_share": 0.0326,
+      "ema_short": 3809.7617197297513,
+      "macd": -9.13251842669888,
+      "relative_growth": 0.02603821443798541,
+      "volatility": 0.6026880572220231,
+      "persistence": 1.0,
+      "source_score": 0.5135380358005824
+    },
+    "data_status": "partial",
+    "joint_score": 0.5135380358005824
+  },
+  {
+    "topic_id": "ai_agents",
+    "topic_label": "AI Agents",
+    "crossref_score": 0.4837775849808008,
+    "crossref_features": {
+      "source": "crossref",
+      "topic_id": "ai_agents",
+      "topic_label": "AI Agents",
+      "window_start": "2025-06",
+      "window_end": "2025-07",
+      "latest_activity": 15940.0,
+      "latest_share": 0.1547,
+      "ema_short": 15650.126430455595,
+      "macd": -363.33917224206016,
+      "relative_growth": 0.017616955305952517,
+      "volatility": 0.6415690325435451,
+      "persistence": 1.0,
+      "source_score": 0.4837775849808008
+    },
+    "data_status": "partial",
+    "joint_score": 0.4837775849808008
+  },
+  {
+    "topic_id": "embodied_intelligence",
+    "topic_label": "Embodied Intelligence",
+    "crossref_score": 0.4330488343625742,
+    "crossref_features": {
+      "source": "crossref",
+      "topic_id": "embodied_intelligence",
+      "topic_label": "Embodied Intelligence",
+      "window_start": "2025-06",
+      "window_end": "2025-07",
+      "latest_activity": 21977.0,
+      "latest_share": 0.2133,
+      "ema_short": 21663.832719167694,
+      "macd": -703.5484919548544,
+      "relative_growth": 0.010708418350331927,
+      "volatility": 0.6999967939252706,
+      "persistence": 1.0,
+      "source_score": 0.4330488343625742
+    },
+    "data_status": "partial",
+    "joint_score": 0.4330488343625742
+  },
+  {
+    "topic_id": "large_language_models",
+    "topic_label": "Large Language Models",
+    "crossref_score": 0.40744940766041005,
+    "crossref_features": {
+      "source": "crossref",
+      "topic_id": "large_language_models",
+      "topic_label": "Large Language Models",
+      "window_start": "2025-06",
+      "window_end": "2025-07",
+      "latest_activity": 37265.0,
+      "latest_share": 0.3617,
+      "ema_short": 35741.16496877372,
+      "macd": -1631.9667052527438,
+      "relative_growth": -0.01624340749069987,
+      "volatility": 0.5963433829706842,
+      "persistence": 1.0,
+      "source_score": 0.40744940766041005
+    },
+    "data_status": "partial",
+    "joint_score": 0.40744940766041005
+  },
+  {
+    "topic_id": "llm",
+    "topic_label": "Large Language Models",
+    "gdelt_score": 0.40201348369475887,
+    "gdelt_features": {
+      "source": "gdelt",
+      "topic_id": "llm",
+      "topic_label": "Large Language Models",
+      "window_start": "2025-06",
+      "window_end": "2025-07",
+      "latest_activity": 5569.0,
+      "latest_share": 0.8762,
+      "ema_short": 8473.792794151232,
+      "macd": -979.5134161067999,
+      "relative_growth": 0.002705093321310434,
+      "volatility": 0.25302147056945984,
+      "persistence": 1.0,
+      "source_score": 0.40201348369475887
+    },
+    "data_status": "partial",
+    "joint_score": 0.40201348369475887
+  },
+  {
+    "topic_id": "quantum_computing",
+    "topic_label": "Quantum Computing",
+    "crossref_score": 0.39466083856367423,
+    "crossref_features": {
+      "source": "crossref",
+      "topic_id": "quantum_computing",
+      "topic_label": "Quantum Computing",
+      "window_start": "2025-06",
+      "window_end": "2025-07",
+      "latest_activity": 24104.0,
+      "latest_share": 0.234,
+      "ema_short": 21864.914009958506,
+      "macd": -863.6961232379617,
+      "relative_growth": 0.0006289380681894405,
+      "volatility": 0.71030083678373,
+      "persistence": 1.0,
+      "source_score": 0.39466083856367423
+    },
+    "data_status": "partial",
+    "joint_score": 0.39466083856367423
+  },
+  {
+    "topic_id": "metaverse",
+    "topic_label": "Metaverse",
+    "crossref_score": 0.3498785970455774,
+    "crossref_features": {
+      "source": "crossref",
+      "topic_id": "metaverse",
+      "topic_label": "Metaverse",
+      "window_start": "2025-06",
+      "window_end": "2025-07",
+      "latest_activity": 363.0,
+      "latest_share": 0.0035,
+      "ema_short": 371.1371416822076,
+      "macd": -35.563698094141955,
+      "relative_growth": -0.052528060357790944,
+      "volatility": 0.7624897965451576,
+      "persistence": 1.0,
+      "source_score": 0.3498785970455774
+    },
+    "data_status": "partial",
+    "joint_score": 0.3498785970455774
+  },
+  {
+    "topic_id": "quantum_comp",
+    "topic_label": "Quantum Computing",
+    "gdelt_score": 0.3407719110039831,
+    "gdelt_features": {
+      "source": "gdelt",
+      "topic_id": "quantum_comp",
+      "topic_label": "Quantum Computing",
+      "window_start": "2025-06",
+      "window_end": "2025-07",
+      "latest_activity": 782.0,
+      "latest_share": 0.1232,
+      "ema_short": 1200.5807841792703,
+      "macd": -174.62103262793744,
+      "relative_growth": -0.019187653520110697,
+      "volatility": 0.27107460411982603,
+      "persistence": 1.0,
+      "source_score": 0.3407719110039831
+    },
+    "data_status": "partial",
+    "joint_score": 0.3407719110039831
+  }
+]

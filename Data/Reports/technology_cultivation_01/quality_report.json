@@ -1,0 +1,195 @@
+{
+  "overall_score": 0,
+  "by_topic": {
+    "ai_agents": {
+      "label": "AI Agents",
+      "windows": 30,
+      "filled_windows": 0,
+      "overall_coverage": 0.16666666666666666,
+      "crossref_coverage": 1.0,
+      "gdelt_coverage": 0.0,
+      "openalex_coverage": 0.0,
+      "arxiv_coverage": 0.0,
+      "uspto_coverage": 0.0,
+      "github_coverage": 0.0
+    },
+    "embodied_intelligence": {
+      "label": "Embodied Intelligence",
+      "windows": 30,
+      "filled_windows": 0,
+      "overall_coverage": 0.16666666666666666,
+      "crossref_coverage": 1.0,
+      "gdelt_coverage": 0.0,
+      "openalex_coverage": 0.0,
+      "arxiv_coverage": 0.0,
+      "uspto_coverage": 0.0,
+      "github_coverage": 0.0
+    },
+    "large_language_models": {
+      "label": "Large Language Models",
+      "windows": 30,
+      "filled_windows": 0,
+      "overall_coverage": 0.16666666666666666,
+      "crossref_coverage": 1.0,
+      "gdelt_coverage": 0.0,
+      "openalex_coverage": 0.0,
+      "arxiv_coverage": 0.0,
+      "uspto_coverage": 0.0,
+      "github_coverage": 0.0
+    },
+    "llm": {
+      "label": "Large Language Models",
+      "windows": 30,
+      "filled_windows": 0,
+      "overall_coverage": 0.16666666666666666,
+      "crossref_coverage": 0.0,
+      "gdelt_coverage": 1.0,
+      "openalex_coverage": 0.0,
+      "arxiv_coverage": 0.0,
+      "uspto_coverage": 0.0,
+      "github_coverage": 0.0
+    },
+    "metaverse": {
+      "label": "Metaverse",
+      "windows": 30,
+      "filled_windows": 0,
+      "overall_coverage": 0.16666666666666666,
+      "crossref_coverage": 1.0,
+      "gdelt_coverage": 0.0,
+      "openalex_coverage": 0.0,
+      "arxiv_coverage": 0.0,
+      "uspto_coverage": 0.0,
+      "github_coverage": 0.0
+    },
+    "quantum_comp": {
+      "label": "Quantum Computing",
+      "windows": 30,
+      "filled_windows": 0,
+      "overall_coverage": 0.16666666666666666,
+      "crossref_coverage": 0.0,
+      "gdelt_coverage": 1.0,
+      "openalex_coverage": 0.0,
+      "arxiv_coverage": 0.0,
+      "uspto_coverage": 0.0,
+      "github_coverage": 0.0
+    },
+    "quantum_computing": {
+      "label": "Quantum Computing",
+      "windows": 30,
+      "filled_windows": 0,
+      "overall_coverage": 0.16666666666666666,
+      "crossref_coverage": 1.0,
+      "gdelt_coverage": 0.0,
+      "openalex_coverage": 0.0,
+      "arxiv_coverage": 0.0,
+      "uspto_coverage": 0.0,
+      "github_coverage": 0.0
+    },
+    "robotics": {
+      "label": "Robotics",
+      "windows": 30,
+      "filled_windows": 0,
+      "overall_coverage": 0.16666666666666666,
+      "crossref_coverage": 1.0,
+      "gdelt_coverage": 0.0,
+      "openalex_coverage": 0.0,
+      "arxiv_coverage": 0.0,
+      "uspto_coverage": 0.0,
+      "github_coverage": 0.0
+    }
+  },
+  "by_source": {
+    "crossref": {
+      "coverage": 0.75,
+      "anomaly_count": 90,
+      "total_windows": 240
+    },
+    "gdelt": {
+      "coverage": 0.25,
+      "anomaly_count": 190,
+      "total_windows": 240
+    },
+    "openalex": {
+      "coverage": 0.0,
+      "anomaly_count": 240,
+      "total_windows": 240
+    },
+    "arxiv": {
+      "coverage": 0.0,
+      "anomaly_count": 240,
+      "total_windows": 240
+    },
+    "uspto": {
+      "coverage": 0.0,
+      "anomaly_count": 240,
+      "total_windows": 240
+    },
+    "github": {
+      "coverage": 0.0,
+      "anomaly_count": 240,
+      "total_windows": 240
+    }
+  },
+  "issues": [
+    "Topic ai_agents: low coverage (16.7%)",
+    "Topic ai_agents: no gdelt data",
+    "Topic ai_agents: no openalex data",
+    "Topic ai_agents: no arxiv data",
+    "Topic ai_agents: no uspto data",
+    "Topic ai_agents: no github data",
+    "Topic embodied_intelligence: low coverage (16.7%)",
+    "Topic embodied_intelligence: no gdelt data",
+    "Topic embodied_intelligence: no openalex data",
+    "Topic embodied_intelligence: no arxiv data",
+    "Topic embodied_intelligence: no uspto data",
+    "Topic embodied_intelligence: no github data",
+    "Topic large_language_models: low coverage (16.7%)",
+    "Topic large_language_models: no gdelt data",
+    "Topic large_language_models: no openalex data",
+    "Topic large_language_models: no arxiv data",
+    "Topic large_language_models: no uspto data",
+    "Topic large_language_models: no github data",
+    "Topic llm: low coverage (16.7%)",
+    "Topic llm: no crossref data",
+    "Topic llm: no openalex data",
+    "Topic llm: no arxiv data",
+    "Topic llm: no uspto data",
+    "Topic llm: no github data",
+    "Topic metaverse: low coverage (16.7%)",
+    "Topic metaverse: no gdelt data",
+    "Topic metaverse: no openalex data",
+    "Topic metaverse: no arxiv data",
+    "Topic metaverse: no uspto data",
+    "Topic metaverse: no github data",
+    "Topic quantum_comp: low coverage (16.7%)",
+    "Topic quantum_comp: no crossref data",
+    "Topic quantum_comp: no openalex data",
+    "Topic quantum_comp: no arxiv data",
+    "Topic quantum_comp: no uspto data",
+    "Topic quantum_comp: no github data",
+    "Topic quantum_computing: low coverage (16.7%)",
+    "Topic quantum_computing: no gdelt data",
+    "Topic quantum_computing: no openalex data",
+    "Topic quantum_computing: no arxiv data",
+    "Topic quantum_computing: no uspto data",
+    "Topic quantum_computing: no github data",
+    "Topic robotics: low coverage (16.7%)",
+    "Topic robotics: no gdelt data",
+    "Topic robotics: no openalex data",
+    "Topic robotics: no arxiv data",
+    "Topic robotics: no uspto data",
+    "Topic robotics: no github data",
+    "1240 anomaly cells detected (see by_source for breakdown)"
+  ],
+  "anomaly_summary": {
+    "total_anomaly_cells": 1240,
+    "sources_with_anomalies": [
+      "crossref_count",
+      "gdelt_count",
+      "openalex_count",
+      "arxiv_count",
+      "uspto_count",
+      "github_count"
+    ]
+  }
+}

@@ -120,5 +120,6 @@ def check_data_quality(
 
 def save_quality_report(report: dict[str, Any], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    from processors.json_utils import NumpyEncoder
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(report, f, ensure_ascii=False, indent=2)
+        json.dump(report, f, ensure_ascii=False, indent=2, cls=NumpyEncoder)

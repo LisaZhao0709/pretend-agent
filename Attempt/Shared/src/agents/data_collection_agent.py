@@ -8,6 +8,7 @@ records are persisted to interim JSONL, one file per source.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from dataclasses import dataclass
@@ -22,12 +23,11 @@ from agents.base_agent import BaseAgent, AgentResult
 
 # Importing the collector modules registers them with the registry.
 import data_collectors.crossref  # noqa: F401
-import data_collectors.openalex  # noqa: F401
 import data_collectors.arxiv     # noqa: F401
 import data_collectors.uspto     # noqa: F401
 import data_collectors.gdelt      # noqa: F401
 import data_collectors.github     # noqa: F401
-from data_collectors.base import get_collector, registered_sources
+from data_collectors.base import get_collector_class as get_collector, _COLLECTORS as registered_sources
 
 
 @dataclass
@@ -53,7 +53,7 @@ class DataCollectionAgent(BaseAgent):
         report = {
             "dataset": self.cfg.dataset_name,
             "started_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "registered_sources": registered_sources(),
+            "registered_sources": list(registered_sources.keys()),
             "by_topic": [],
             "by_source": {},
         }
@@ -65,15 +65,19 @@ class DataCollectionAgent(BaseAgent):
             if not source_cfg.get("enabled", False):
                 report["by_source"][source_name] = {"enabled": False}
                 continue
+            print(f"  -> Collecting source: {source_name}...")
             try:
-                collector = get_collector(source_name)
+                collector_cls = get_collector(source_name)
+                collector = collector_cls()
             except ValueError as exc:
+                print(f"     error: {exc}")
                 report["by_source"][source_name] = {"enabled": True, "error": str(exc)}
                 continue
 
             try:
-                recs = collector.collect(self.cfg, http_settings, source_cfg)
+                recs = asyncio.run(collector.collect(self.cfg, http_settings, source_cfg))
             except Exception as exc:  # noqa: BLE001 - one source failing must not abort others
+                print(f"     exception: {exc}")
                 report["by_source"][source_name] = {
                     "enabled": True,
                     "error": str(exc),
@@ -85,6 +89,7 @@ class DataCollectionAgent(BaseAgent):
             records_by_source[source_name] = recs
             ok_count = sum(1 for r in recs if r.get("collection_status") == "ok")
             failed_count = sum(1 for r in recs if r.get("collection_status") != "ok")
+            print(f"     done: {len(recs)} records (ok: {ok_count}, failed: {failed_count})")
             report["by_source"][source_name] = {
                 "enabled": True,
                 "records": len(recs),
@@ -120,7 +125,8 @@ class DataCollectionAgent(BaseAgent):
         report["finished_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
         out = self.cfg.reports_path / "collection_report.json"
         out.parent.mkdir(parents=True, exist_ok=True)
+        from processors.json_utils import NumpyEncoder
         with open(out, "w", encoding="utf-8") as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
+            json.dump(report, f, ensure_ascii=False, indent=2, cls=NumpyEncoder)
 
         return AgentResult(ok=True, detail={"report_path": str(out)})

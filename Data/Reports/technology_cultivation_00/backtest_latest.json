@@ -1,0 +1,280 @@
+[
+  {
+    "history_end": "2023-03",
+    "future_end": "2023-04",
+    "status": "insufficient_complete_sources",
+    "evaluated_topics": 0,
+    "top1_future_activity": null,
+    "mean_future_activity": null
+  },
+  {
+    "history_end": "2023-04",
+    "future_end": "2023-05",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2023-05",
+    "future_end": "2023-06",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2023-06",
+    "future_end": "2023-07",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2023-07",
+    "future_end": "2023-08",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2023-08",
+    "future_end": "2023-09",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2023-09",
+    "future_end": "2023-10",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2023-10",
+    "future_end": "2023-11",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2023-11",
+    "future_end": "2023-12",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2023-12",
+    "future_end": "2024-01",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2024-01",
+    "future_end": "2024-02",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2024-02",
+    "future_end": "2024-03",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2024-03",
+    "future_end": "2024-04",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2024-04",
+    "future_end": "2024-05",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2024-05",
+    "future_end": "2024-06",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2024-06",
+    "future_end": "2024-07",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2024-07",
+    "future_end": "2024-08",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2024-08",
+    "future_end": "2024-09",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2024-09",
+    "future_end": "2024-10",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2024-10",
+    "future_end": "2024-11",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2024-11",
+    "future_end": "2024-12",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2024-12",
+    "future_end": "2025-01",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2025-01",
+    "future_end": "2025-02",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2025-02",
+    "future_end": "2025-03",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2025-03",
+    "future_end": "2025-04",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2025-04",
+    "future_end": "2025-05",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  },
+  {
+    "history_end": "2025-05",
+    "future_end": "2025-06",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "llm",
+    "top1_future_activity": 1.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 2.0
+  },
+  {
+    "history_end": "2025-06",
+    "future_end": "2025-07",
+    "status": "ok",
+    "evaluated_topics": 2,
+    "top1_topic_id": "quantum_comp",
+    "top1_future_activity": 0.0,
+    "mean_future_activity": 0.5,
+    "top1_lift": 0.0
+  }
+]

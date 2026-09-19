@@ -24,6 +24,7 @@ CROSSREF_BASE_URL = "https://api.crossref.org/works"
 class CrossrefCollector(MonthCountCollector):
     """Monthly publication-count collector for CrossRef Works API."""
 
+    source_name = "crossref"
     base_url = CROSSREF_BASE_URL
 
     def build_params(self, query: str, date_start: str, date_end: str, contact: str) -> dict[str, Any]:

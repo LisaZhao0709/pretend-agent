@@ -19,6 +19,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import asyncio
 from typing import Any, Iterable
 
 from dotenv import load_dotenv
@@ -101,7 +102,7 @@ def _write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> int:
 class GithubCollector:
     """Daily trending-repo snapshot collector for GitHub search API."""
 
-    def collect(
+    async def collect(
         self,
         cfg: PipelineConfig,
         http_settings: dict[str, Any],
@@ -129,6 +130,9 @@ class GithubCollector:
             )
 
         client = PoliteApiClient(raw_cache_dir, gh_settings)
+
+
+        await client.__aenter__()
         headers = _github_headers()
 
         k_new = int(source_cfg.get("k_new", 100))
@@ -187,7 +191,7 @@ class GithubCollector:
                     }
                     cache_key = f"github_{topic.topic_id}_{tag}_{day}_p{page}"
                     try:
-                        response = client.get_json(
+                        response = await client.get_json(
                             SEARCH_REPOS, params, cache_key=cache_key, extra_headers=headers,
                         )
                     except Exception as exc:  # noqa: BLE001 - preserve partial progress
@@ -279,4 +283,5 @@ class GithubCollector:
         signals_path = interim_dir / f"github_signals_{day}.jsonl"
         n_signals = _write_jsonl(signals_path, all_signals)
 
+        await client.__aexit__(None, None, None)
         return records

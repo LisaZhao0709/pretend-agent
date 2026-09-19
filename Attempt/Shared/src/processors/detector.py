@@ -26,53 +26,80 @@ def _log1p_safe(value: float) -> float:
 def detect_zscore_outliers(
     values: list[float],
     threshold: float = 3.0,
+    window: int = 6,
 ) -> list[bool]:
-    """Flag values whose z-score (on log1p transform) exceeds threshold.
+    """Flag values whose rolling z-score (on log1p transform) exceeds threshold.
 
     Args:
         values: List of numeric activity counts.
         threshold: Absolute z-score threshold (default 3.0).
-
-    Returns:
-        List of booleans, True where the value is an outlier.
-    """
-    if len(values) < 3:
-        return [False] * len(values)
-    log_vals = [_log1p_safe(v) for v in values]
-    n = len(log_vals)
-    mean = sum(log_vals) / n
-    variance = sum((v - mean) ** 2 for v in log_vals) / n
-    std = math.sqrt(variance)
-    if std < 1e-9:
-        return [False] * n
-    return [abs((v - mean) / std) > threshold for v in log_vals]
-
-
-def detect_iqr_outliers(
-    values: list[float],
-    k: float = 1.5,
-) -> list[bool]:
-    """Flag values outside Q1 - k*IQR and Q3 + k*IQR.
-
-    Args:
-        values: List of numeric activity counts.
-        k: IQR multiplier (default 1.5).
+        window: Number of past periods to compute rolling statistics.
 
     Returns:
         List of booleans, True where the value is an outlier.
     """
     n = len(values)
-    if n < 4:
-        return [False] * n
-    sorted_vals = sorted(values)
-    q1 = sorted_vals[n // 4]
-    q3 = sorted_vals[3 * n // 4]
-    iqr = q3 - q1
-    if iqr < 1e-9:
-        return [False] * n
-    lower = q1 - k * iqr
-    upper = q3 + k * iqr
-    return [v < lower or v > upper for v in values]
+    log_vals = [_log1p_safe(v) for v in values]
+    outliers = [False] * n
+
+    for i in range(n):
+        start = max(0, i - window)
+        past = log_vals[start:i]
+        
+        if len(past) < 2:
+            outliers[i] = False
+            continue
+            
+        mean = sum(past) / len(past)
+        variance = sum((v - mean) ** 2 for v in past) / len(past)
+        std = math.sqrt(variance)
+        if std < 1e-9:
+            outliers[i] = False
+        else:
+            outliers[i] = abs((log_vals[i] - mean) / std) > threshold
+
+    return outliers
+
+
+def detect_iqr_outliers(
+    values: list[float],
+    k: float = 1.5,
+    window: int = 6,
+) -> list[bool]:
+    """Flag values outside Q1 - k*IQR and Q3 + k*IQR based on a rolling window.
+
+    Args:
+        values: List of numeric activity counts.
+        k: IQR multiplier (default 1.5).
+        window: Number of past periods to compute rolling statistics.
+
+    Returns:
+        List of booleans, True where the value is an outlier.
+    """
+    n = len(values)
+    outliers = [False] * n
+
+    for i in range(n):
+        start = max(0, i - window)
+        past = values[start:i]
+        
+        m = len(past)
+        if m < 4:
+            outliers[i] = False
+            continue
+            
+        sorted_vals = sorted(past)
+        q1 = sorted_vals[m // 4]
+        q3 = sorted_vals[3 * m // 4]
+        iqr = q3 - q1
+        if iqr < 1e-9:
+            outliers[i] = False
+        else:
+            lower = q1 - k * iqr
+            upper = q3 + k * iqr
+            outliers[i] = values[i] < lower or values[i] > upper
+
+    return outliers
 
 
 def detect_consecutive_zeros(

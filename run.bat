@@ -1,6 +1,14 @@
 @echo off
-REM Predictive Agents 一键运行（双击即可）
-REM 用法：双击此文件，或在命令行输入 run
+chcp 65001 > nul
+echo ===================================================
+echo   Starting Predictive Agents Pipeline...
+echo ===================================================
 
-powershell -ExecutionPolicy Bypass -File "%~dp0run.ps1" %*
+cd /d "%~dp0Attempt"
+"C:\Users\Xiaol\AppData\Local\Programs\Python\Python311\python.exe" -u run_pipeline.py
+
+echo.
+echo ===================================================
+echo   Pipeline Finished!
+echo ===================================================
 pause

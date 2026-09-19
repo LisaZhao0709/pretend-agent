@@ -1,735 +1,262 @@
-# 预测智能体项目 - 架构图解
+# 预测智能体项目 - 系统架构图解
 
-## 一、整体系统架构
+本文档提供**预测智能体（Predictive Agents）**系统的全方位可视化架构图与时序数据流图。文档涵盖系统分层、端到端数据流转、前瞻偏差消除机制、多周期回测模型、DeepSeek 研报智能体及一键运行集成。
+
+---
+
+## 一、整体系统三层架构
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Predictive Agents System                          │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       Predictive Agents System 顶层架构                      │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│   Resources/     │  │     Data/        │  │    Attempt/      │
-│  (外部资料)      │  │   (数据流转)     │  │   (所有代码)     │
-├──────────────────┤  ├──────────────────┤  ├──────────────────┤
-│ Papers/          │  │ Raw/             │  │ Shared/          │
-│ Documentation/   │  │ Interim/         │  │ Baselines/       │
-│ Project_Intro/   │  │ Processed/       │  │ Memory_Design/   │
-│ Historical/      │  │ Reports/         │  │ Reasoning_Arch/  │
-│ Notes/           │  │ Metadata/        │  │ Reproduction/    │
-│                  │  │ Schemas/         │  │ Sandbox/         │
-│                  │  │ Cache/           │  │ scripts/         │
-│                  │  │                  │  │ notebooks/       │
-│                  │  │                  │  │ configs/         │
-└──────────────────┘  └──────────────────┘  └──────────────────┘
+  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐
+  │       Resources/        │  │          Data/          │  │        Attempt/         │
+  │     (外部资料与文献)     │  │      (分层数据资产)     │  │     (所有工程与代码)     │
+  ├─────────────────────────┤  ├─────────────────────────┤  ├─────────────────────────┤
+  │ Papers/ (学术论文)      │  │ Raw/ (不可变原始缓存)   │  │ Shared/ (稳定复用核心库) │
+  │ Documentation/ (参考档) │  │ Interim/ (清洗中间态)   │  │ Baselines/ (基线与对比)  │
+  │ Project_Intro/ (综述)   │  │ Processed/ (透视宽表)   │  │ Memory_Design/ (记忆)    │
+  │ Historical/ (历史沉淀)  │  │ Reports/ (质量/回测/研报)│ │ Reasoning_Arch/ (推理)  │
+  │ Notes/ (阅读笔记)       │  │ Cache/ (SQLite API缓存) │  │ Reproduction/ (复现)    │
+  │                         │  │ Metadata/ (数据血缘)    │  │ configs/ (集中配置文件) │
+  │                         │  │ Schemas/ (字段校验)     │  │ run_pipeline.py (主入口)│
+  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘
 ```
 
 ---
 
-## 二、数据流转管道（Data Pipeline）
+## 二、端到端数据与预测流水线（End-to-End Pipeline）
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Data Flow Pipeline                           │
-└─────────────────────────────────────────────────────────────────────┘
-
-                        ┌──────────────────┐
-                        │  Topics Config   │
-                        │  (topics.yaml)   │
-                        └────────┬─────────┘
-                                 │
-                ┌────────────────┼────────────────┐
-                │                │                │
-                ▼                ▼                ▼
-        ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-        │  OpenAlex    │  │    GDELT     │  │   GitHub     │
-        │  Works API   │  │  DOC 2.0 API │  │  REST API    │
-        └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
-               │                 │                 │
-        ┌──────▼─────────────────▼─────────────────▼──────┐
-        │          Data Collection Agent                  │
-        │  (Shared/src/agents/data_collection_agent.py)  │
-        └──────┬─────────────────────────────────────────┘
-               │
-        ┌──────▼──────────────────────────────────────────┐
-        │  Raw Data Storage (Data/Raw/APIs/...)           │
-        │  ├─ openalex_records.jsonl (cached)             │
-        │  ├─ gdelt_records.jsonl (cached)                │
-        │  └─ github_signals_YYYY-MM-DD.jsonl (cached)    │
-        └──────┬──────────────────────────────────────────┘
-               │
-        ┌──────▼──────────────────────────────────────────┐
-        │          Data Analysis Agent                    │
-        │  (Shared/src/agents/data_analysis_agent.py)    │
-        │  ├─ Load & Merge Records                        │
-        │  ├─ Create Pivot Table                          │
-        │  └─ Quality Check                               │
-        └──────┬──────────────────────────────────────────┘
-               │
-        ┌──────▼──────────────────────────────────────────┐
-        │  Processed Data (Data/Processed/...)            │
-        │  └─ pivot_table_extended.jsonl                  │
-        │     (每行一个月份，包含多源计数)                │
-        └──────┬──────────────────────────────────────────┘
-               │
-        ┌──────▼──────────────────────────────────────────┐
-        │  Reports (Data/Reports/...)                     │
-        │  ├─ collection_report.json                      │
-        │  ├─ quality_report.json                         │
-        │  ├─ baseline_results.json                       │
-        │  └─ summary.json                                │
-        └──────────────────────────────────────────────────┘
-```
-
----
-
-## 三、Shared 模块架构
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Shared Module (Attempt/Shared/src)               │
-└─────────────────────────────────────────────────────────────────────┘
-
-                        ┌──────────────┐
-                        │  config.py   │
-                        │ (配置加载)   │
-                        └──────┬───────┘
-                               │
-        ┌──────────────────────┼──────────────────────┐
-        │                      │                      │
-        ▼                      ▼                      ▼
-    ┌────────────┐      ┌──────────────┐      ┌──────────────┐
-    │   agents/  │      │data_collectors│      │   tools/     │
-    │            │      │               │      │              │
-    ├────────────┤      ├──────────────┤      ├──────────────┤
-    │base_agent  │      │openalex_     │      │search_tool   │
-    │            │      │client.py     │      │(路由器)      │
-    │data_       │      │              │      │              │
-    │collection_ │      │gdelt_client  │      │github_client │
-    │agent.py    │      │.py           │      │              │
-    │            │      │              │      │              │
-    │data_       │      │              │      │              │
-    │analysis_   │      │              │      │              │
-    │agent.py    │      │              │      │              │
-    └────────────┘      └──────────────┘      └──────────────┘
-        │                      │                      │
-        │                      │                      │
-        └──────────────────────┼──────────────────────┘
-                               │
-                        ┌──────▼──────────┐
-                        │  processors/    │
-                        │                 │
-                        ├─────────────────┤
-                        │normalize.py     │
-                        │(JSONL I/O,      │
-                        │ merge, pivot)   │
-                        │                 │
-                        │quality_checker  │
-                        │.py              │
-                        │(质量检查)       │
-                        └─────────────────┘
-```
-
-### 3.1 Agent 框架
-
-```
-┌──────────────────────────────────────────┐
-│         BaseAgent (Interface)            │
-├──────────────────────────────────────────┤
-│ + run() -> AgentResult                   │
-└──────────────────────────────────────────┘
-         △                    △
-         │                    │
-         │                    │
-    ┌────┴──────────┐    ┌────┴──────────┐
-    │DataCollection │    │DataAnalysis   │
-    │Agent          │    │Agent          │
-    ├───────────────┤    ├───────────────┤
-    │ + run()       │    │ + run()       │
-    │   ├─ 迭代主题 │    │   ├─ 加载记录 │
-    │   ├─ 调用     │    │   ├─ 合并数据 │
-    │   │ SearchTool│    │   ├─ 创建透视 │
-    │   └─ 保存结果 │    │   └─ 质量检查 │
-    └───────────────┘    └───────────────┘
-
-AgentResult:
-  ├─ ok: bool
-  └─ detail: dict[str, Any]
-```
-
-### 3.2 数据采集客户端
-
-```
-┌─────────────────────────────────────────────────────────┐
-│              Data Collectors                            │
-└─────────────────────────────────────────────────────────┘
-
-OpenAlex Client:
-  ├─ fetch_openalex_grouped()
-  │  ├─ 构建查询参数
-  │  ├─ 检查缓存 (SHA256(url+params))
-  │  ├─ 发送 API 请求 (group_by=publication_date)
-  │  ├─ 处理 429 重试 (指数退避)
-  │  └─ 保存缓存
-  │
-  └─ collect_openalex_topic()
-     ├─ 调用 fetch_openalex_grouped()
-     ├─ 本地聚合到月度窗口
-     └─ 返回标准化记录列表
-
-GDELT Client:
-  ├─ fetch_gdelt_timeline()
-  │  ├─ 构建时间线请求
-  │  ├─ 检查缓存
-  │  ├─ 发送 API 请求
-  │  ├─ 处理 429 重试
-  │  └─ 保存缓存
-  │
-  └─ collect_gdelt_topic()
-     ├─ 调用 fetch_gdelt_timeline()
-     ├─ 本地拆分为月度窗口
-     └─ 返回标准化记录列表
-
-GitHub Client:
-  ├─ fetch_github_trending()
-  │  ├─ 加载 GITHUB_TOKEN (可选)
-  │  ├─ 查询新仓库 (created:>=D-7)
-  │  ├─ 查询活跃仓库 (pushed:>=D-1)
-  │  ├─ 应用语言/组织过滤
-  │  └─ 保存快照
-  │
-  └─ 返回聚合信号
-```
-
-### 3.3 处理器
-
-```
-┌─────────────────────────────────────────────────────────┐
-│              Processors                                 │
-└─────────────────────────────────────────────────────────┘
-
-normalize.py:
-  ├─ save_records_to_jsonl()
-  │  └─ list[dict] → JSONL 文件
-  │
-  ├─ load_jsonl()
-  │  └─ JSONL 文件 → list[dict]
-  │
-  ├─ merge_records_by_source()
-  │  └─ OpenAlex + GDELT → 合并排序列表
-  │
-  ├─ build_feature_matrix()
-  │  └─ 按主题分组
-  │
-  └─ create_pivot_table()
-     └─ 透视：每行一个月份，包含多源计数
-
-quality_checker.py:
-  ├─ check_data_quality()
-  │  ├─ 缺失值检查
-  │  ├─ 异常值检查
-  │  ├─ 覆盖范围检查
-  │  └─ 计算质量评分
-  │
-  └─ save_quality_report()
-     └─ 生成 JSON 报告
+                     ┌───────────────────────────────┐
+                     │ configs/ (topics/sources/etc) │
+                     └───────────────┬───────────────┘
+                                     │
+                                     ▼
+        ┌─────────────────────────────────────────────────────────┐
+        │  1. 多源数据采集阶段 (DataCollectionAgent & SearchTool)  │
+        └────────────────────────────┬────────────────────────────┘
+                                     │
+         ┌───────────────────────────┼───────────────────────────┐
+         ▼                           ▼                           ▼
+  ┌──────────────┐            ┌──────────────┐            ┌──────────────┐
+  │   CrossRef   │            │    GDELT     │            │   OpenAlex   │
+  │  (学术元数据) │            │ (新闻/事件流)│            │ (学术大盘数据)│
+  └──────┬───────┘            └──────┬───────┘            └──────┬───────┘
+         │                           │                           │
+         └───────────────────────────┼───────────────────────────┘
+                                     ▼
+        ┌─────────────────────────────────────────────────────────┐
+        │  2. 网络请求与持久化缓存 (PoliteApiClient)               │
+        │  - 令牌桶速率限制 + 指数退避重试                        │
+        │  - SQLite api_cache_v2.db 持久化 + 历史 JSON 缓存兜底   │
+        └────────────────────────────┬────────────────────────────┘
+                                     ▼ (写入 Data/Interim/*.jsonl)
+        ┌─────────────────────────────────────────────────────────┐
+        │  3. 无前瞻偏差的数据预处理 (Processors)                  │
+        │  - cleaner.py: 纯单向因果平滑 (禁止 center=True / bfill) │
+        │  - detector.py: 滚动历史 6 个月滑动窗口异常值检测       │
+        │  - normalize.py: 截面 Z-Score 标准化 (按 window_start)  │
+        └────────────────────────────┬────────────────────────────┘
+                                     ▼ (写入 Data/Processed/pivot_table.jsonl)
+        ┌─────────────────────────────────────────────────────────┐
+        │  4. 相对注意力份额与动量特征工程 (scoring.py)            │
+        │  - 相对份额: Share_t = (count + 1) / (Total + 6)        │
+        │  - 动量比率: Growth_t = Share_MACD / Share_EMA          │
+        └────────────────────────────┬────────────────────────────┘
+                                     ▼
+        ┌─────────────────────────────────────────────────────────┐
+        │  5. 多周期前向排序回测 (Walk-Forward Backtesting)       │
+        │  - 1-Month Horizon (短期爆发捕获)                       │
+        │  - 3-Month Horizon (中期趋势稳定性)                     │
+        │  - 指标: Top-1 Lift、Spearman 秩相关、NDCG@3、NDCG@5    │
+        └────────────────────────────┬────────────────────────────┘
+                                     ▼ (输出 backtest_latest.json / ranking.json)
+        ┌─────────────────────────────────────────────────────────┐
+        │  6. 研报智能体直接集成 (ReportingAgent)                 │
+        │  - 纯原生 HTTP POST 访问 api.deepseek.com/chat/completions│
+        │  - 整合定量回测指标、Top-3 爆发技术、风险预警与研究建议 │
+        └────────────────────────────┬────────────────────────────┘
+                                     ▼
+        ┌─────────────────────────────────────────────────────────┐
+        │  7. 决策成果交付: Data/Reports/.../final_report.md      │
+        └─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 四、实验组织结构
+## 三、前瞻偏差消除机制对比（Look-ahead Bias Elimination）
+
+时序预测中最严重的系统性误差来自于“未来信息泄露”。本项目在数据清洗与标准化各环节执行严格的因果性设计：
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Experiment Organization                          │
-└─────────────────────────────────────────────────────────────────────┘
+【传统/旧版方式 (存在前瞻偏差 ❌)】
+时间轴:   t-2      t-1       t       t+1      t+2
+数值:     x(t-2)   x(t-1)   x(t)    x(t+1)   x(t+2)
+                   ▲                 ▲
+                   └────[center=True]┘  <-- 计算 t 时刻平滑值时利用了未来的 t+1 和 t+2！
+全局统计:  Z-score = (x(t) - Mean_全局) / Std_全局  <-- 全局均值包含未来所有样本！
 
-Attempt/
-│
-├─ Shared/                    ← 共享模块（稳定接口）
-│  └─ src/
-│     ├─ agents/
-│     ├─ data_collectors/
-│     ├─ tools/
-│     └─ processors/
-│
-├─ Baselines/                 ← 简单基线、对照实验
-│  ├─ experiments/
-│  │  ├─ 2026-08-14_simple_baseline/
-│  │  │  ├─ README.md
-│  │  │  └─ src/
-│  │  │     ├─ pipeline.py (主入口)
-│  │  │     ├─ baseline_model.py (MA, LR)
-│  │  │     ├─ evaluator.py (MAE, MAPE, RMSE)
-│  │  │     ├─ report_generator.py
-│  │  │     └─ test_*.py
-│  │  │
-│  │  └─ technology_cultivation_forecast_00/
-│  │
-│  ├─ src/
-│  ├─ tests/
-│  └─ configs/
-│
-├─ Memory_Design/             ← 记忆结构实验
-│  ├─ experiments/
-│  ├─ src/
-│  ├─ tests/
-│  ├─ configs/
-│  └─ docs/
-│
-├─ Reasoning_Architecture/    ← 推理链路实验
-│  ├─ experiments/
-│  ├─ src/
-│  ├─ tests/
-│  ├─ configs/
-│  └─ docs/
-│
-├─ Reproduction/              ← 复现论文/项目
-│  ├─ experiments/
-│  ├─ src/
-│  ├─ tests/
-│  ├─ configs/
-│  └─ docs/
-│
-├─ Sandbox/                   ← 短期探索
-│  └─ ...
-│
-├─ scripts/                   ← 环境、数据检查脚本
-├─ notebooks/                 ← 探索性笔记本
-├─ configs/                   ← 跨实验配置
-│  ├─ default.yaml
-│  ├─ topics.yaml
-│  └─ sources.yaml
-│
-└─ docs/                      ← 架构图、设计说明
+──────────────────────────────────────────────────────────────────────────
+
+【当前项目机制 (严格无未来信息因果流 ✅)】
+时间轴:   t-2      t-1       t       | 预测未来: t+1      t+2
+数值:     x(t-2)   x(t-1)   x(t)    |           ?        ?
+          └───────┬─────────┘       |
+                  ▼                 |
+       [单向历史滑动窗口 (window=3)]  |  <-- 仅依赖 <= t 的历史点，绝不向右穿透
+       异常检测: rolling(6).mean()  |  <-- 动态 6 个月历史统计基准
+       标准化: Group by window_start |  <-- 仅在同一截面横向技术间比对相对强弱
 ```
 
 ---
 
-## 五、基线实验流程（2026-08-14_simple_baseline）
+## 四、Shared 核心模块交互拓扑
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                  Baseline Experiment Pipeline                       │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Shared 核心库 (Attempt/Shared/src)                       │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-                            START
-                              │
-                              ▼
-                    ┌──────────────────┐
-                    │ Phase 1: Collect │
-                    │   Data from      │
-                    │ OpenAlex, GDELT  │
-                    └────────┬─────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ openalex_       │
-                    │ records.jsonl   │
-                    │ gdelt_records   │
-                    │ .jsonl          │
-                    └────────┬────────┘
-                             │
-                              ▼
-                    ┌──────────────────┐
-                    │ Phase 2: Normalize│
-                    │   & Merge Data   │
-                    │   Create Pivot   │
-                    └────────┬─────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ pivot_table_    │
-                    │ extended.jsonl  │
-                    │ (每行一个月份)  │
-                    └────────┬────────┘
-                             │
-                              ▼
-                    ┌──────────────────┐
-                    │ Phase 3: Baseline│
-                    │  Forecasting     │
-                    │ ├─ Moving Avg    │
-                    │ └─ Linear Reg    │
-                    └────────┬─────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ baseline_       │
-                    │ results.json    │
-                    │ (详细预测)      │
-                    └────────┬────────┘
-                             │
-                              ▼
-                    ┌──────────────────┐
-                    │ Phase 4: Evaluate│
-                    │ ├─ MAE           │
-                    │ ├─ MAPE          │
-                    │ └─ RMSE          │
-                    └────────┬─────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ baseline_       │
-                    │ evaluations     │
-                    │ .json           │
-                    │ summary.json    │
-                    └────────┬────────┘
-                             │
-                              ▼
-                            END
-```
-
-### 5.1 时间序列切分
-
-```
-Timeline: 2023-01 ────────────────────────────────── 2025-07
-
-Train (70%)          │ Validation (15%) │ Test (30%)
-2023-01 ─────────────┤ 2024-11 ────────┤ 2025-02 ────── 2025-07
-                     │                  │
-                     └──────────────────┘
-                     
-滚动预测：
-  Month 1: 预测 Month 2 (使用 Month 1 历史)
-  Month 2: 预测 Month 3 (使用 Month 1-2 历史)
-  ...
-  Month N: 预测 Month N+1 (使用 Month 1-N 历史)
+                                ┌──────────────┐
+                                │  config.py   │
+                                │ (全局配置树) │
+                                └──────┬───────┘
+                                       │
+        ┌──────────────────────────────┼──────────────────────────────┐
+        │                              │                              │
+        ▼                              ▼                              ▼
+┌──────────────┐               ┌──────────────┐               ┌──────────────┐
+│  agents/     │               │http_client.py│               │  processors/ │
+├──────────────┤               ├──────────────┤               ├──────────────┤
+│base_agent    │ ──使用网络──► │PoliteApi     │ ◄──清洗结果── │cleaner.py    │
+│collection_   │               │Client        │               │(因果平滑)    │
+│agent         │               │- 速率限制器  │               │detector.py   │
+│analysis_     │               │- SQLite缓存  │               │(历史异常)    │
+│agent         │               │- 指数退避    │               │normalize.py  │
+│reporting_    │               └──────┬───────┘               │(截面标准化)  │
+│agent         │                      │                       │quality_      │
+│(DeepSeek直连)│                      ▼                       │checker.py    │
+└──────────────┘               ┌──────────────┐               └──────────────┘
+                               │data_         │
+                               │collectors/   │
+                               │- crossref    │
+                               │- gdelt       │
+                               │- openalex    │
+                               │- arxiv       │
+                               │- github      │
+                               └──────────────┘
 ```
 
 ---
 
-## 六、配置驱动的参数流
+## 五、相对注意力份额与动量预测模型（Scoring Architecture）
+
+针对绝对发文量/热度导致头部技术长年霸榜的问题，引入**相对注意力份额（Relative Share）**与**相对动量比率（Relative Momentum）**：
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                  Configuration-Driven Parameters                    │
-└─────────────────────────────────────────────────────────────────────┘
-
-default.yaml
-├─ project_name: predictive-agents
-├─ timezone: Asia/Shanghai
-├─ random_seed: 42
-├─ data_root: F:\Predictive agents\Data
-├─ resources_root: F:\Predictive agents\Resources
-└─ default_data_split:
-   ├─ train_ratio: 0.7
-   ├─ validation_ratio: 0.15
-   └─ test_ratio: 0.15
-        │
-        ▼
-   PipelineConfig (dataclass)
-   ├─ 路径属性 (自动生成)
-   │  ├─ raw_api_path
-   │  ├─ interim_path
-   │  ├─ processed_path
-   │  └─ reports_path
-   │
-   └─ 主题列表
-      └─ topics: list[TopicConfig]
-
-topics.yaml
-├─ topics:
-│  ├─ llm
-│  │  ├─ topic_id: llm
-│  │  ├─ topic_label: Large Language Models
-│  │  ├─ openalex_query: large language model
-│  │  └─ gdelt_query: "large language model"
-│  │
-│  ├─ ai_agent
-│  ├─ robotics
-│  ├─ quantum_comp
-│  └─ edge_comp
-        │
-        ▼
-   TopicConfig (dataclass)
-   ├─ topic_id
-   ├─ topic_label
-   ├─ openalex_query
-   └─ gdelt_query
-
-sources.yaml
-├─ sources:
-│  ├─ openalex:
-│  │  └─ enabled: true
-│  │
-│  ├─ gdelt:
-│  │  └─ enabled: true
-│  │
-│  └─ github:
-│     ├─ enabled: true
-│     ├─ k_new: 100
-│     ├─ k_active: 50
-│     ├─ delta_7d_threshold: 100
-│     ├─ use_llm_summarize: false
-│     ├─ language_whitelist: []
-│     └─ org_whitelist: []
-        │
-        ▼
-   SearchTool 路由参数
-   ├─ 启用/禁用数据源
-   ├─ GitHub 搜索参数
-   └─ 过滤条件
+                      各技术在 t 月份的原始计数: Count(i, t)
+                                        │
+                                        ▼
+               ┌──────────────────────────────────────────────────┐
+               │ 相对注意力份额计算 (带 Laplace 平滑):             │
+               │ Share(i, t) = [Count(i, t) + 1] / [Total(t) + N] │
+               └────────────────────────┬─────────────────────────┘
+                                        │
+                    ┌───────────────────┴───────────────────┐
+                    ▼                                       ▼
+        ┌──────────────────────┐                ┌──────────────────────┐
+        │ 快速指数移动平均 EMA  │                │ 平滑异同移动平均 MACD │
+        │ EMA_t(Share(i))      │                │ MACD_t(Share(i))     │
+        └───────────┬──────────┘                └───────────┬──────────┘
+                    │                                       │
+                    └───────────────────┬───────────────────┘
+                                        ▼
+               ┌──────────────────────────────────────────────────┐
+               │ 相对动量增长率 (Relative Momentum Growth):        │
+               │ Growth(i, t) = MACD_t(Share(i)) / EMA_t(Share(i))│
+               └────────────────────────┬─────────────────────────┘
+                                        │
+                                        ▼
+               ┌──────────────────────────────────────────────────┐
+               │ 多周期排序回测 (Walk-Forward 28 个检验窗口):      │
+               │ 1M Horizon: 捕获短线暴增信号                     │
+               │ 3M Horizon: 验证中长期趋势持续度                 │
+               │ 输出: Top-1 Lift, Spearman Rho, NDCG@3, NDCG@5   │
+               └──────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 七、API 缓存机制
+## 六、DeepSeek 直连研报智能体（Reporting Agent Topology）
+
+为彻底摆脱外部 OpenAI 客户端库的网络代理限制与连接不稳定问题，研报智能体采用纯原生异步 HTTP 请求直连 DeepSeek 官方端点：
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                      API Caching Strategy                           │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       ReportingAgent 拓扑架构                                │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-API 请求
-  │
-  ├─ 构建 URL + 参数
-  │
-  ├─ 计算缓存键
-  │  └─ SHA256(json.dumps({"url": url, "params": params}))[:16]
-  │
-  ├─ 检查缓存文件
-  │  └─ cache_dir / f"{key}.json"
-  │
-  ├─ 缓存命中？
-  │  ├─ YES → 返回缓存数据
-  │  │
-  │  └─ NO → 发送 HTTP 请求
-  │     │
-  │     ├─ 速率限制 (sleep)
-  │     │
-  │     ├─ 429 Too Many Requests?
-  │     │  ├─ YES → 指数退避重试
-  │     │  └─ NO → 继续
-  │     │
-  │     ├─ 保存响应到缓存
-  │     │
-  │     └─ 返回数据
-  │
-  └─ 返回标准化记录
-```
-
----
-
-## 八、数据质量检查流程
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Data Quality Check Flow                          │
-└─────────────────────────────────────────────────────────────────────┘
-
-pivot_table_extended.jsonl
-        │
-        ▼
-┌──────────────────────────────┐
-│ check_data_quality()         │
-├──────────────────────────────┤
-│ 1. 缺失值检查                │
-│    ├─ 每个主题的记录数       │
-│    ├─ 每个数据源的覆盖率     │
-│    └─ 时间窗口的完整性       │
-│                              │
-│ 2. 异常值检查                │
-│    ├─ 计数为 0 的比例        │
-│    ├─ 极端值 (IQR 方法)      │
-│    └─ 时间序列平滑性         │
-│                              │
-│ 3. 覆盖范围检查              │
-│    ├─ 主题覆盖率             │
-│    ├─ 时间覆盖率             │
-│    └─ 数据源覆盖率           │
-│                              │
-│ 4. 计算质量评分              │
-│    ├─ 0-100 分               │
-│    └─ 加权平均               │
-└──────────────────────────────┘
-        │
-        ▼
-quality_report.json
-├─ overall_score: float
-├─ by_topic: dict
-├─ by_source: dict
-├─ missing_values: dict
-├─ anomalies: dict
-└─ coverage: dict
+  ┌────────────────────────┐  ┌────────────────────────┐
+  │  backtest_latest.json  │  │ forecast_ranking.json  │
+  │  (全周期回测综合指标)  │  │  (最新各技术前向评分)  │
+  └───────────┬────────────┘  └───────────┬────────────┘
+              │                           │
+              └─────────────┬─────────────┘
+                            ▼
+           ┌──────────────────────────────────┐
+           │   Prompt & Context 动态拼装器    │
+           │  - 格式化 Top-3 爆发技术         │
+           │  - 注入 1M/3M NDCG@3/5 指标      │
+           │  - 设定严谨学术决策 Prompt 模板  │
+           └────────────────┬─────────────────┘
+                            │
+                            ▼
+           ┌──────────────────────────────────┐
+           │ PoliteApiClient.post_json()      │
+           │ URL: api.deepseek.com/chat/com...│
+           │ Auth: Bearer ${DEEPSEEK_API_KEY} │
+           │ Body: {model: deepseek-chat, ...}│
+           └────────────────┬─────────────────┘
+                            │ (原生 HTTPS 直连，国内秒级响应)
+                            ▼
+           ┌──────────────────────────────────┐
+           │        DeepSeek-V3 / Chat        │
+           └────────────────┬─────────────────┘
+                            │
+                            ▼
+           ┌──────────────────────────────────┐
+           │    Markdown 报告校验与磁盘持久化 │
+           │ Data/Reports/.../final_report.md │
+           └──────────────────────────────────┘
 ```
 
 ---
 
-## 九、模块依赖关系
+## 七、一键自动化触发与开发入口（Developer Entrypoints）
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Module Dependencies                              │
-└─────────────────────────────────────────────────────────────────────┘
-
-Baselines/experiments/2026-08-14_simple_baseline/src/pipeline.py
-  │
-  ├─ imports from Shared/src/
-  │  ├─ config.py
-  │  │  └─ load_pipeline_config(), generate_monthly_windows()
-  │  │
-  │  ├─ data_collectors/
-  │  │  ├─ openalex_client.py
-  │  │  │  └─ collect_openalex_topic()
-  │  │  │
-  │  │  └─ gdelt_client.py
-  │  │     └─ collect_gdelt_topic()
-  │  │
-  │  └─ processors/
-  │     ├─ normalize.py
-  │     │  ├─ merge_records_by_source()
-  │     │  ├─ create_pivot_table()
-  │     │  ├─ save_records_to_jsonl()
-  │     │  └─ load_jsonl()
-  │     │
-  │     └─ quality_checker.py
-  │        └─ check_data_quality()
-  │
-  └─ imports from local src/
-     ├─ baseline_model.py
-     │  ├─ moving_average_forecast()
-     │  ├─ linear_regression_forecast()
-     │  └─ forecast_topic()
-     │
-     ├─ evaluator.py
-     │  ├─ evaluate_forecast()
-     │  └─ summarize_results()
-     │
-     └─ report_generator.py
-        └─ generate_report()
-
-External Dependencies:
-  ├─ numpy (数值计算)
-  ├─ pandas (数据处理)
-  ├─ pydantic (数据验证)
-  ├─ pyyaml (配置解析)
-  ├─ requests (HTTP 请求)
-  ├─ python-dotenv (环境变量)
-  └─ scikit-learn (机器学习)
+                                  开发者交互层
+             ┌──────────────────────────┬──────────────────────────┐
+             ▼                          ▼                          ▼
+      [ 双击 run.bat ]           [ 按下键盘 F5 ]        [ 终端 CLI 命令 ]
+   (Windows批处理免闪退)       (VS Code launch.json)     (python -u run_pipeline)
+             │                          │                          │
+             └──────────────────────────┼──────────────────────────┘
+                                        ▼
+                         ┌──────────────────────────────┐
+                         │   Attempt/run_pipeline.py    │
+                         │   - 加载 PipelineConfig      │
+                         │   - 调度 DataCollectionAgent │
+                         │   - 调度 DataAnalysisAgent   │
+                         │   - 执行时序排序回测         │
+                         │   - 调度 ReportingAgent      │
+                         └──────────────┬───────────────┘
+                                        ▼
+                         ┌──────────────────────────────┐
+                         │   生成最新报告与回测数据     │
+                         │   (控制台展示完成与文件路径) │
+                         └──────────────────────────────┘
 ```
-
----
-
-## 十、错误处理与恢复
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                  Error Handling & Recovery                          │
-└─────────────────────────────────────────────────────────────────────┘
-
-API 请求失败
-  │
-  ├─ 429 Too Many Requests
-  │  └─ 指数退避重试 (最多 5 次)
-  │     └─ 等待时间: 30s × (attempt + 1)
-  │
-  ├─ 网络超时
-  │  └─ 检查缓存 (如果有)
-  │     ├─ YES → 使用缓存数据
-  │     └─ NO → 记录错误，继续下一个主题
-  │
-  ├─ 无效响应格式
-  │  └─ 记录错误，继续下一个主题
-  │
-  └─ 其他错误
-     └─ 记录到 collection_report.json
-        └─ 继续处理其他主题
-
-数据处理失败
-  │
-  ├─ JSONL 文件不存在
-  │  └─ 返回空列表，继续
-  │
-  ├─ JSON 解析错误
-  │  └─ 跳过该行，继续
-  │
-  └─ 数据类型不匹配
-     └─ 尝试类型转换，失败则跳过
-
-Agent 执行失败
-  │
-  └─ 返回 AgentResult(ok=False, detail={"error": str(e)})
-     └─ 上层调用者检查 ok 标志，决定是否继续
-```
-
----
-
-## 十一、扩展点
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                      Extension Points                               │
-└─────────────────────────────────────────────────────────────────────┘
-
-1. 新增数据源
-   └─ 实现 data_collectors/new_source_client.py
-      ├─ fetch_new_source_grouped()
-      └─ collect_new_source_topic()
-      
-      在 tools/search_tool.py 中添加路由
-      └─ if source == "new_source": ...
-
-2. 新增预测模型
-   └─ Baselines/experiments/YYYY-MM-DD_new_model/src/
-      ├─ new_model.py (模型实现)
-      ├─ evaluator.py (评估逻辑)
-      └─ pipeline.py (主入口)
-
-3. 新增 Agent
-   └─ Shared/src/agents/new_agent.py
-      ├─ 继承 BaseAgent
-      └─ 实现 run() 方法
-
-4. 新增处理器
-   └─ Shared/src/processors/new_processor.py
-      └─ 在 DataAnalysisAgent 中调用
-
-5. 新增主题
-   └─ 编辑 configs/topics.yaml
-      └─ 添加新的 TopicConfig 条目
-
-6. 新增数据源参数
-   └─ 编辑 configs/sources.yaml
-      └─ 在 SearchTool 中使用
-```
-
----
-
-## 十二、关键路径
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                      Critical Paths                                 │
-└─────────────────────────────────────────────────────────────────────┘
-
-最快路径（仅使用缓存）：
-  pipeline.py
-    └─ run_collection() (使用缓存的 API 响应)
-       └─ 1-2 秒
-
-完整路径（新数据采集）：
-  pipeline.py
-    ├─ run_collection() (新 API 请求)
-    │  ├─ OpenAlex: 3 秒 × 主题数
-    │  ├─ GDELT: 10 秒 × 主题数
-    │  └─ GitHub: 0.4-1.5 秒 × 主题数
-    │
-    ├─ run_normalization()
-    │  └─ 1-2 秒
-    │
-    ├─ run_forecasting()
-    │  └─ 1-2 秒
-    │
-    └─ run_evaluation()
-       └─ 1-2 秒
-
-总耗时估计：
-  ├─ 缓存命中：< 5 秒
-  ├─ 新采集 (5 主题)：
-  │  ├─ OpenAlex: 15 秒
-  │  ├─ GDELT: 50 秒
-  │  ├─ GitHub: 5-10 秒
-  │  └─ 总计：70-75 秒
-  │
-  └─ 首次运行：1-2 分钟
-```
-
----
-
-**架构图生成时间**：2026-08-17  
-**项目根目录**：`F:\Predictive agents`
